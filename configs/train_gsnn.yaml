@@ -1,0 +1,17 @@
+base_dir: '/data/aryan/Seekg/Datasets/epic_kitchens_affordances/data'
+subset_path: '/data/aryan/Seekg/Datasets/epic_kitchens_affordances/data/scene_based_affordance.pkl'
+KG_path: '/data/aryan/Seekg/Datasets/epic_kitchens_affordances/data/epic_kitchens_KG.pkl'
+
+gsnn_path: ''
+epochs: 100
+batch_size: 1
+alpha: 0.1
+lr: 0.01
+
+gcn:
+  n_feat: 100
+  n_hid: 100
+  n_out: 100
+  n_layers: 1
+  dropout: 0.5
+  
