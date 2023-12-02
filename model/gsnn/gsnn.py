@@ -38,7 +38,7 @@ class GSNN(nn.Module):
         imp = self.imp(h, adj[current_idx][:,current_idx])
 
         imp = F.normalize(imp, p=1, dim=0)
-        values, indices = torch.topk(imp[len(active_idx):], k=3)
+        # values, indices = torch.topk(imp[len(active_idx):], k=3)
         # print(values.requires_grad)
 
         # return values, neighbor_idx[indices].float().requires_grad_(True)
