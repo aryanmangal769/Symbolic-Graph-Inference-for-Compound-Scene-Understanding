@@ -27,18 +27,17 @@ class PLACES_365(Dataset):
         self.verbs = []
         self.bboxes = []
 
-        for category in os.listdir(self.base_dir):
-            category_dir = os.path.join(self.base_dir, category)
+        for category_file in os.listdir(self.base_dir):
+            category_dir = os.path.join(self.base_dir, category_file)
 
             with open(os.path.join(category_dir), 'rb') as f:
                 category_bboxes_labels = pickle.load(f)
 
-            for image_path in category_bboxes_labels.keys():
+            for i,image_path in enumerate(category_bboxes_labels.keys()):
                 self.paths.append(image_path)
-                self.bboxes.append(format_bbox(category_bboxes_labels[image_path]))
+                self.bboxes.append(self.format_bbox(category_bboxes_labels[image_path]))
+                category = '_'.join(category_file.split('_')[:-2])
                 self.verbs.append(category)
-
-                category = category.split('_')[0]
 
                 if category == 'aquarium':
                     self.objects.append('bird')
@@ -72,13 +71,16 @@ class PLACES_365(Dataset):
                 elif category == 'botanical_garden':
                     self.objects.append('potted plant')
                 elif category == 'food_court':
-                    self.objects.append('chair')     
+                    self.objects.append('chair')
+
+                # if i == 500:
+                #     break     
 
     def format_bbox(self, bbox):
         bbox_formated = []
         for obj in bbox:
             for i, obj in enumerate(bbox[obj]):
-                bbox_formated.append({'object': obj['label']+'_'+i, 'object_bbox': obj['bbox']})  
+                bbox_formated.append({'object': obj['label']+'_'+str(i), 'object_bbox': obj['bbox']})  
         return bbox_formated
 
     def __len__(self):
@@ -90,7 +92,6 @@ class PLACES_365(Dataset):
         obj = self.objects[idx]
         verb = self.verbs[idx]
         bbox = self.bboxes[idx]
-
         return  [bbox,(obj, verb)]
 
         

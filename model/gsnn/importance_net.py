@@ -8,6 +8,7 @@ class Importance_net(nn.Module):
         self.feature_dim = feature_dim
         self.linear = nn.Linear(feature_dim, feature_dim)
         self.relu = nn.ReLU()
+        self.tanh = nn.Tanh()
 
     def forward(self, h , A):
         """
@@ -16,6 +17,7 @@ class Importance_net(nn.Module):
         # print(h)
         h = self.linear(h)
         h = self.relu(h)
+        # h = self.tanh(h)
 
         h = A@h
         h = torch.sum(h,1)

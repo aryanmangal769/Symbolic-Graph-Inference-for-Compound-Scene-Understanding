@@ -1,3 +1,4 @@
+dataset: epic_kitchens_affordances
 base_dir: '/data/aryan/Seekg/Datasets/epic_kitchens_affordances/data'
 subset_path: '/data/aryan/Seekg/Datasets/epic_kitchens_affordances/data/scene_based_affordance.pkl'
 KG_path: '/data/aryan/Seekg/Datasets/epic_kitchens_affordances/data/epic_kitchens_KG.pkl'

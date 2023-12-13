@@ -19,6 +19,7 @@ def generate_SG_from_bboxs(bboxes, threshold):
 
 def get_KG_active_idx(SG_nodes, SG_Adj, KG_vocab , obj):
     active_idx = []
+    SG_nodes = [node.split('_')[0] for node in SG_nodes]
 
     if 'saucepan' in SG_nodes:
         SG_nodes[SG_nodes.index('saucepan')] = 'pan'
@@ -41,6 +42,9 @@ def get_KG_active_idx(SG_nodes, SG_Adj, KG_vocab , obj):
     active_idx.append(obj_idx)
 
     # Find the neighbors of the object in SG_Adj
+    if obj not in SG_nodes:  # If the object is not present in the scene graph we takes the first object at the principal object
+        obj = SG_nodes[0]
+        # print("Object not in scene graph, taking the first object at the principal object")
     neighbors = torch.nonzero(SG_Adj[SG_nodes.index(obj)])
 
     # Find the indices of neighbors in KG_vocab

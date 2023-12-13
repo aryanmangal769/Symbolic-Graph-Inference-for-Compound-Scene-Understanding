@@ -13,10 +13,13 @@ from tqdm import tqdm
 from model.build_model import build_gsnn 
 from model.mgnn.mgnn_loss import MGNNLoss
 from datasets.epic_kitchens import EPIC_Kitchens
+from datasets.places_365 import PLACES_365
 from utils.dataset_utils import custom_collate
 from utils.scene_graph_utils import generate_SG_from_bboxs, get_KG_active_idx, visualize_graph
 from utils.vis_utils import visualize_bbox
 import numpy as np
+import pdb
+from sklearn.metrics import f1_score
 
 
 def get_actions(idx, KG_path ):
@@ -63,29 +66,9 @@ def get_accuracy(predictions, targets, threshold=0.5):
 
     return accuracy
 
-def get_precision_recall(predictions, targets):
-    """
-    Compute precision and recall given predicted outputs and ground truth labels.
-
-    Args:
-    - predictions: List of predicted strings
-    - targets: List of ground truth strings
-
-    Returns:
-    - precision: Precision value
-    - recall: Recall value
-    """
-    with torch.no_grad():
-        true_positives = sum(pred == target for pred, target in zip(predictions, targets))
-        false_positives = sum(pred != target for pred, target in zip(predictions, targets))
-        false_negatives = sum(pred != target for pred, target in zip(predictions, targets))
-
-        precision = true_positives / (true_positives + false_positives + 1e-7)
-        recall = true_positives / (true_positives + false_negatives + 1e-7)
-
-    return precision, recall
 
 def train(configs):
+    dataset_name = configs['dataset']
     base_dir = configs['base_dir']
     subset_path = configs['subset_path']
     epochs = configs['epochs']
@@ -97,18 +80,20 @@ def train(configs):
     KG_path = configs['KG_path']    
     with open(KG_path, 'rb') as f:
         KG_embeddings, KG_adjacency_matrix, KG_vocab, KG_nodes = pickle.load(f)
-    # print(len(KG_vocab))
         
     device = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
 
-    dataset = EPIC_Kitchens(base_dir, subset_path)
+    if dataset_name == 'places365':
+        dataset = PLACES_365(base_dir, subset_path)
+    else:
+        dataset = EPIC_Kitchens(base_dir, subset_path)
     dataset_size = len(dataset)
     train_size = int(0.7 * dataset_size)
     test_size = dataset_size - train_size
 
     train_set, test_set = random_split(dataset, [train_size, test_size])
-    train_dataloader = DataLoader(train_set, batch_size=batch_size, shuffle=True, num_workers=1, collate_fn=custom_collate)
-    test_dataloader = DataLoader(test_set, batch_size=batch_size, shuffle=True, num_workers=1, collate_fn=custom_collate)
+    train_dataloader = DataLoader(train_set, batch_size=batch_size, shuffle=True, num_workers=8, collate_fn=custom_collate)
+    test_dataloader = DataLoader(test_set, batch_size=batch_size, shuffle=True, num_workers=8, collate_fn=custom_collate)
     
     model = build_gsnn(configs)
     model.train()
@@ -122,12 +107,13 @@ def train(configs):
 
     for epoch in tqdm(range(epochs)):
         train_accuracy = []
-        train_precision = []
-        train_recall = []
+
+        predicted_verbs = []
+        actual_verbs = []
 
         for VISOR_bboxs,objs in tqdm(train_dataloader):
             verbs = torch.tensor([KG_vocab.index(obj[1]) for obj in objs])
-            # print(verbs)
+
             GSNN_outputs = []   
             for  bbox, obj in zip(VISOR_bboxs, objs):
                 verb = obj[1]
@@ -135,17 +121,10 @@ def train(configs):
                 # print("Verb: ", verb)
                 SG_nodes, SG_Adj = generate_SG_from_bboxs(bbox, 200) 
                 # visualize_graph(SG_nodes, SG_Adj)
-                # print(SG_nodes)
-                # print(SG_Adj)
 
-                # active_idx = get_KG_active_idx(SG_nodes, SG_Adj, KG_vocab , obj)
-                # print(active_idx)
-
-                # for node in active_idx:
-                #     print(KG_vocab[node])
-                # print("####")
                 active_idx = []
                 for i in SG_nodes:
+                    i = i.split('_')[0]
                     if i in KG_vocab:
                         active_idx.append(KG_vocab.index(i))
                 
@@ -153,63 +132,50 @@ def train(configs):
                 # print(active_idx)
                 imp, idx = model(KG_embeddings, KG_adjacency_matrix, active_idx)
                 onehot = torch.where(idx == torch.tensor(KG_vocab.index(verb)), torch.ones_like(imp), torch.zeros_like(imp))
-                # print(imp)
-                # print(onehot)
 
-                # print(imp.shape)
-                # print(onehot.shape)
                 loss = MSE_loss(imp, onehot.float())
-                # print(loss)
                 optimizer.zero_grad()
 
                 loss.backward(retain_graph=True)   
                 optimizer.step()
 
+                if imp.shape[0] < 6:
+                    imp = torch.cat((imp, torch.zeros(6, dtype=torch.float32).to(imp.device)))
+                    idx = torch.cat((idx, torch.zeros(6, dtype=torch.int64).to(idx.device)))
                 try : 
-                    GSNN_output =idx[torch.topk(imp, k=3).indices]
+                    GSNN_output =idx[torch.topk(imp, k=6).indices]
                 except:
                     GSNN_output =idx[[0,0,0]]
-                # GSNN_output =idx[torch.topk(imp, k=2).indices]
-                actions = get_actions(torch.cat((GSNN_output.detach().cpu(), active_idx)), KG_path)
-                # print(actions)
-                # for node in GSNN_output.detach().int():
-                #     print(KG_vocab[node])
+
+                if dataset_name != 'places365': 
+                    actions = get_actions(torch.cat((GSNN_output.detach().cpu(), active_idx)), KG_path)
+                    # print(actions)
+                    # for node in GSNN_output.detach().int():
+                    #     print(KG_vocab[node])
+
+                if KG_vocab[GSNN_output[0]] != 'None':
+                    predicted_verbs.append(KG_vocab[GSNN_output[0]])
+                else:
+                    predicted_verbs.append(KG_vocab[GSNN_output[1]])
+
+                actual_verbs.append(verb)
                 GSNN_outputs.append(GSNN_output) 
-            # break
             
             GSNN_outputs = torch.stack(GSNN_outputs, dim=1)
-
-            # loss = MSE_loss(GSNN_outputs.squeeze(1).float(), verbs.to(GSNN_outputs.device).float())
-            # print(GSNN_outputs.reshape((GSNN_outputs.shape[1],GSNN_outputs.shape[0])).float().requires_grad)
-            # loss = mgnn_loss(GSNN_outputs.reshape((GSNN_outputs.shape[1],GSNN_outputs.shape[0])).float(), verbs.to(GSNN_output.device).float())
-            # print(loss)
-
-            # optimizer.zero_grad()
-
-            # loss.backward(retain_graph=True)   
-            # optimizer.step()
-
-            precision, recall = get_precision_recall(GSNN_outputs, verbs)
-            train_precision.append(precision)
-            train_recall.append(recall)
-        
             train_accuracy.append(get_accuracy(GSNN_outputs.squeeze(1).float(), verbs.to(GSNN_outputs.device).float()))
-            # print(accuracy[-1])
-        average_train_precision = sum(train_precision) / len(train_precision)
-        average_train_recall = sum(train_recall) / len(train_recall)
         
-        print(f"Epoch: {epoch}, Loss: {loss.item()}, Train Precision: {average_train_precision}, Train Recall: {average_train_recall}")
+        labels = np.unique(actual_verbs)
+        print(labels )
+        print("F1 score: ", f1_score(actual_verbs, predicted_verbs,labels = labels, average=None))
         print("Epoch: ", epoch, " Loss: ", loss.item(), "Train Accuracy: ", sum(train_accuracy)/len(train_accuracy))
 
         test_accuracy = []
-        test_precision = []
-        test_recall = []
+        predicted_verbs = []
+        actual_verbs = []
 
         for VISOR_bboxs,objs in tqdm(test_dataloader):
             verbs = torch.tensor([KG_vocab.index(obj[1]) for obj in objs])
-            # print(verbs)
             GSNN_outputs = []   
-            # if objs[0][1] == 'shake' and objs[0][0] == 'cup':
 
             for  bbox, obj in zip(VISOR_bboxs, objs):
                 verb = obj[1]
@@ -217,57 +183,47 @@ def train(configs):
                 # print("Verb: ", verb)
                 SG_nodes, SG_Adj = generate_SG_from_bboxs(bbox, 200) 
                 # visualize_graph(SG_nodes, SG_Adj)
-                # print(SG_nodes)
-                # print(SG_Adj)
 
-                active_idx = get_KG_active_idx(SG_nodes, SG_Adj, KG_vocab , obj)
+                active_idx = []
+                for i in SG_nodes:
+                    i = i.split('_')[0]
+                    if i in KG_vocab:
+                        active_idx.append(KG_vocab.index(i))
+                
+                active_idx = torch.tensor(list(set(active_idx)))
                 # print(active_idx)
-
-                # for node in active_idx:
-                #     print(KG_vocab[node])
-                # print("####")
                 imp, idx = model(KG_embeddings, KG_adjacency_matrix, active_idx)
+
                 onehot = torch.where(idx == torch.tensor(KG_vocab.index(verb)), torch.ones_like(imp), torch.zeros_like(imp))
-                # print(imp)
-                # print(onehot)
-
-                # print(imp.shape)
-                # print(onehot.shape)
                 loss = MSE_loss(imp, onehot.float())
-                # print(loss)
 
-                GSNN_output =idx[torch.topk(imp, k=3).indices]
-                actions = get_actions(torch.cat((GSNN_output.detach().cpu(), active_idx)), KG_path)
-                # print(actions)
-                # for node in GSNN_output.detach().int():
-                #     print(KG_vocab[node])
+                if imp.shape[0] < 6:
+                    imp = torch.cat((imp, torch.zeros(6, dtype=torch.float32).to(imp.device)))
+                    idx = torch.cat((idx, torch.zeros(6, dtype=torch.int64).to(idx.device)))
+
+                GSNN_output =idx[torch.topk(imp, k=6).indices]
+                if dataset_name != 'places365': 
+                    actions = get_actions(torch.cat((GSNN_output.detach().cpu(), active_idx)), KG_path)
+                    # print(actions)
+                    # for node in GSNN_output.detach().int():
+                    #     print(KG_vocab[node])
+
+                if KG_vocab[GSNN_output[0]] != 'None':
+                    predicted_verbs.append(KG_vocab[GSNN_output[0]])
+                else:
+                    predicted_verbs.append(KG_vocab[GSNN_output[1]])
+
+                actual_verbs.append(verb)
                 GSNN_outputs.append(GSNN_output) 
-            # break
             
-            GSNN_outputs = torch.stack(GSNN_outputs, dim=1)
-
-            # loss = MSE_loss(GSNN_outputs.squeeze(1).float(), verbs.to(GSNN_outputs.device).float())
-            # print(GSNN_outputs.reshape((GSNN_outputs.shape[1],GSNN_outputs.shape[0])).float().requires_grad)
-            # loss = mgnn_loss(GSNN_outputs.reshape((GSNN_outputs.shape[1],GSNN_outputs.shape[0])).float(), verbs.to(GSNN_output.device).float())
-            # print(loss)
-
-            # optimizer.zero_grad()
-
-            # loss.backward(retain_graph=True)   
-            # optimizer.step()
-
-            precision, recall = get_precision_recall(GSNN_outputs, verbs)
-            test_precision.append(precision)
-            test_recall.append(recall)
-        
+            GSNN_outputs = torch.stack(GSNN_outputs, dim=1)        
             test_accuracy.append(get_accuracy(GSNN_outputs.squeeze(1).float(), verbs.to(GSNN_outputs.device).float()))
-            # print(accuracy[-1])
-        average_test_precision = sum(test_precision) / len(test_precision)
-        average_test_recall = sum(test_recall) / len(test_recall)
         
-        print(f"Epoch: {epoch}, Loss: {loss.item()}, test Precision: {average_test_precision}, test Recall: {average_test_recall}")
+        labels = np.unique(actual_verbs)
+        print(labels )
+        print("F1 score: ", f1_score(actual_verbs, predicted_verbs,labels = labels, average=None))
         print("Epoch: ", epoch, " Loss: ", loss.item(), "test Accuracy: ", sum(test_accuracy)/len(test_accuracy))
-        
+        sys.exit()
             
 
             # verb = objs[0][1]

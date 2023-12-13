@@ -4,9 +4,10 @@ from PIL import Image, ImageDraw
 import matplotlib.pyplot as plt
 import matplotlib.patches as patches
 import pdb
+
 # Load the dictionary containing bounding boxes and labels
 base_dir = "/data/aryan/Seekg/Datasets/places365/Object_annotations"
-category = "restaurant"  # Specify the category you want to visualize
+category = "aquarium"  # Specify the category you want to visualize
 output_file_name = f"{category}_bboxes_labels.pkl"
 output_file_path = os.path.join(base_dir, output_file_name)
 
@@ -20,6 +21,7 @@ iterator = iter(category_bboxes_labels.keys())
 image_path = next(iterator)
 image_path = next(iterator)
 
+print(image_path)
 # Load the image
 img = Image.open(image_path).convert("RGB")
 
@@ -32,10 +34,10 @@ ax.imshow(img)
 
 for obj in image_bboxes_labels:
     print(obj)
-    for obj in image_bboxes_labels[obj]:
-        bbox = obj['bbox']
-        label = obj['label']
-        score = obj['score']
+    for obj_data in image_bboxes_labels[obj]:
+        bbox = obj_data['bbox']
+        label = obj_data['label']
+        score = obj_data['score']
         # print(bbox)
 
         # Add bounding box to the image
@@ -45,7 +47,10 @@ for obj in image_bboxes_labels:
         )
         ax.add_patch(rect)
 
-# Display the image with bounding boxes
+        # Add label text to the image
+        ax.text(bbox[0], bbox[1] - 5, f'{label}: {score:.2f}', color='r', fontsize=8, weight='bold')
+
+# Display the image with bounding boxes and labels
 plt.axis('off')
-plt.show()
-plt.savefig('q4_.png')   
+# plt.show()
+plt.savefig('q4_.png')
