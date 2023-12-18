@@ -32,12 +32,15 @@ class GSNN(nn.Module):
         active_idx: Active node index
         '''
         neighbor_idx = get_neighbour_nodes(adj, active_idx)
-
+        # print(torch.sum(x, dim=1))
         current_idx = torch.cat(( active_idx, neighbor_idx)) 
         h = self.gcn(x[current_idx, :].clone(), adj[current_idx][:, current_idx].clone())
-        imp = self.imp(h, adj[current_idx][:,current_idx])
+        # print(torch.sum(h, dim=1))
 
-        imp = F.normalize(imp, p=1, dim=0)
+        imp = self.imp(h, adj[current_idx][:,current_idx])
+        # print(imp)
+
+        # imp = F.normalize(imp, p=1, dim=0)
         # values, indices = torch.topk(imp[len(active_idx):], k=3)
         # print(values.requires_grad)
 

@@ -1,5 +1,6 @@
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
 
 class Importance_net(nn.Module):
 
@@ -18,6 +19,8 @@ class Importance_net(nn.Module):
         h = self.linear(h)
         h = self.relu(h)
         # h = self.tanh(h)
+
+        # h = F.normalize(h, p=1, dim=1)
 
         h = A@h
         h = torch.sum(h,1)

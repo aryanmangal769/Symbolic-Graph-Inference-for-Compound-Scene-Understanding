@@ -3,6 +3,7 @@ import torch
 import torch.nn as nn
 from torch.utils.data import Dataset, DataLoader, Subset
 from torch.utils.data import random_split
+import torch.nn.functional as F
 import sys
 sys.path.append('.')
 import argparse 
@@ -14,6 +15,7 @@ from model.build_model import build_gsnn
 from model.mgnn.mgnn_loss import MGNNLoss
 from datasets.epic_kitchens import EPIC_Kitchens
 from datasets.places_365 import PLACES_365
+from datasets.ade20k import ADE_20k
 from utils.dataset_utils import custom_collate
 from utils.scene_graph_utils import generate_SG_from_bboxs, get_KG_active_idx, visualize_graph
 from utils.vis_utils import visualize_bbox
@@ -82,6 +84,15 @@ def train(configs):
     KG_path = configs['KG_path']    
     with open(KG_path, 'rb') as f:
         KG_embeddings, KG_adjacency_matrix, KG_vocab, KG_nodes = pickle.load(f)
+    
+    # KG_embeddings = F.normalize(KG_embeddings, p=1, dim=1)
+    
+    # for embedding in KG_embeddings:
+    #     print(torch.sum(embedding))
+    # sys.exit()
+    
+    # sys.exit()
+    # pdb.set_trace()
 
     print(len(KG_vocab))
         
@@ -89,6 +100,8 @@ def train(configs):
 
     if dataset_name == 'places365':
         dataset = PLACES_365(base_dir, subset_path)
+    elif dataset_name == 'ade20k':
+        dataset = ADE_20k(base_dir, subset_path)
     else:
         dataset = EPIC_Kitchens(base_dir, subset_path)
     
@@ -128,7 +141,8 @@ def train(configs):
         #         obj = obj[0]
         #         # print("Verb: ", verb)
 
-        #         SG_nodes, SG_Adj = generate_SG_from_bboxs(bbox, 200) 
+        #         SG_nodes, SG_Adj = generate_SG_from_bboxs(bbox, 500) 
+        #         # print(SG_nodes)
         #         # visualize_graph(SG_nodes, SG_Adj)
 
 
@@ -139,6 +153,7 @@ def train(configs):
         #         #     print(KG_vocab[node])
         #         # print("####")
         #         imp, idx = model(KG_embeddings, KG_adjacency_matrix, active_idx)
+        #         # print(imp)
         #         onehot = torch.where(idx == torch.tensor(KG_vocab.index(verb)), torch.ones_like(imp), torch.zeros_like(imp))
         #         # for node in idx:
         #         #     print(KG_vocab[node])
@@ -192,17 +207,23 @@ def train(configs):
                 verb = obj[1]
                 obj = obj[0]
                 # print("Verb: ", verb)
-                SG_nodes, SG_Adj = generate_SG_from_bboxs(bbox, 200) 
+                SG_nodes, SG_Adj = generate_SG_from_bboxs(bbox, 10000) 
+                # print(SG_nodes)
                 # visualize_graph(SG_nodes, SG_Adj)
-                active_idxs.append(SG_nodes)
+                # active_idxs.append(SG_nodes)
 
                 active_idx = get_KG_active_idx(SG_nodes, SG_Adj, KG_vocab , obj)
                 # print(active_idx)
 
-                # for node in active_idx:
-                #     print(KG_vocab[node])
+                act_arr = []
+                for node in active_idx:
+                    act_arr.append(KG_vocab[node])
+                    # print(KG_vocab[node])
+                active_idxs.append(act_arr)
+
                 imp, idx = model(KG_embeddings, KG_adjacency_matrix, active_idx)
                 onehot = torch.where(idx == torch.tensor(KG_vocab.index(verb)), torch.ones_like(imp), torch.zeros_like(imp))
+
 
                 loss = MSE_loss(imp, onehot.float())
 
@@ -210,13 +231,14 @@ def train(configs):
                     imp = torch.cat((imp, torch.zeros(6, dtype=torch.float32).to(imp.device)))
                     idx = torch.cat((idx, torch.zeros(6, dtype=torch.int64).to(idx.device)))
 
-                GSNN_output =idx[torch.topk(imp, k=6).indices]
+                GSNN_output =idx[torch.topk(imp, k=2).indices]
 
-                if KG_vocab[GSNN_output[0]] != 'None':
-                    predicted_verbs.append(KG_vocab[GSNN_output[0]])
-                else:
-                    predicted_verbs.append(KG_vocab[GSNN_output[1]])
+                # if KG_vocab[GSNN_output[0]] != 'None':
+                #     predicted_verbs.append(KG_vocab[GSNN_output[0]])
+                # else:
+                #     predicted_verbs.append(KG_vocab[GSNN_output[1]])
 
+                predicted_verbs.append([[KG_vocab[GSNN_output[i]] for i in range(2)], torch.topk(imp, k=6).values])
                 actual_verbs.append(verb)
 
 
@@ -225,6 +247,9 @@ def train(configs):
                 # for node in GSNN_output.detach().int():
                 #     print(KG_vocab[node])
                 GSNN_outputs.append(GSNN_output) 
+
+                # sys.exit()
+                # print("####")
             
             GSNN_outputs = torch.stack(GSNN_outputs, dim=1)
             test_accuracy.append(get_accuracy(GSNN_outputs.squeeze(1).float(), verbs.to(GSNN_outputs.device).float()))
@@ -234,8 +259,8 @@ def train(configs):
             pickle.dump([active_idxs,  actual_verbs], f)        
         print("Epoch: ", epoch, " Loss: ", loss.item(), "test Accuracy: ", sum(test_accuracy)/len(test_accuracy))
         labels = np.unique(actual_verbs)
-        print(labels )
-        print("F1 score: ", f1_score(actual_verbs, predicted_verbs,labels = labels, average=None))
+        # print(labels )
+        # print("F1 score: ", f1_score(actual_verbs, predicted_verbs,labels = labels, average=None))
         cm = confusion_matrix(actual_verbs, predicted_verbs, labels=labels)
         plt.figure(figsize=(10,10))
         sns.heatmap(cm, annot=False, linewidths=.5, square=True, cmap='Blues_r',
@@ -247,7 +272,7 @@ def train(configs):
         plt.savefig("results/confusion_matrix.png")
 
 
-        sys.exit()
+        # sys.exit()
 
 
 def main():

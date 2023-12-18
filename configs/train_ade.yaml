@@ -1,0 +1,18 @@
+dataset: ade20k
+base_dir: '/data/aryan/Seekg/MGNN/datasets/ade20k/image_info_dict.pkl'
+subset_path: ''
+KG_path: '/data/aryan/Seekg/Datasets/ade20k/ade_KG.pkl'
+
+gsnn_path: ''
+epochs: 100
+batch_size: 1
+alpha: 0.1
+lr: 0.01
+
+gcn:
+  n_feat: 100
+  n_hid: 100
+  n_out: 100
+  n_layers: 1
+  dropout: 0.5
+  
