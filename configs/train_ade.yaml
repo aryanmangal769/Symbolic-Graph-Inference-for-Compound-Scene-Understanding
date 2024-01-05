@@ -7,7 +7,7 @@ gsnn_path: ''
 epochs: 100
 batch_size: 1
 alpha: 0.1
-lr: 0.01
+lr: 0.000001
 
 gcn:
   n_feat: 100
@@ -15,4 +15,8 @@ gcn:
   n_out: 100
   n_layers: 1
   dropout: 0.5
+
+gsnn:
+  n_steps: 2
+  step_threshold: 0.85
   

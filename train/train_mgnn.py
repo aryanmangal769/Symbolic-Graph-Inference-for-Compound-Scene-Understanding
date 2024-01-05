@@ -85,7 +85,7 @@ def train(configs):
     with open(KG_path, 'rb') as f:
         KG_embeddings, KG_adjacency_matrix, KG_vocab, KG_nodes = pickle.load(f)
     
-    # KG_embeddings = F.normalize(KG_embeddings, p=1, dim=1)
+    KG_embeddings = F.normalize(KG_embeddings, p=1, dim=1)
     
     # for embedding in KG_embeddings:
     #     print(torch.sum(embedding))
@@ -116,7 +116,7 @@ def train(configs):
     train_dataloader = DataLoader(train_set, batch_size=batch_size, shuffle=True, num_workers=8, collate_fn=custom_collate)
     test_dataloader = DataLoader(test_set, batch_size=batch_size, shuffle=True, num_workers=8, collate_fn=custom_collate)
     
-    model = build_gsnn(configs)
+    model = build_gsnn(configs,KG_vocab, KG_nodes)
     model.train()
     
     mgnn_loss = MGNNLoss(alpha=alpha)
@@ -141,7 +141,7 @@ def train(configs):
         #         obj = obj[0]
         #         # print("Verb: ", verb)
 
-        #         SG_nodes, SG_Adj = generate_SG_from_bboxs(bbox, 500) 
+        #         SG_nodes, SG_Adj = generate_SG_from_bboxs(bbox, 1000) 
         #         # print(SG_nodes)
         #         # visualize_graph(SG_nodes, SG_Adj)
 
@@ -159,6 +159,8 @@ def train(configs):
         #         #     print(KG_vocab[node])
         #         # print(onehot)
 
+        #         # print(imp)
+        #         # print(onehot)
         #         loss = MSE_loss(imp, onehot.float())
         #         optimizer.zero_grad()
         #         loss.backward(retain_graph=True)   
@@ -167,7 +169,7 @@ def train(configs):
         #         if imp.shape[0] < 6:
         #             imp = torch.cat((imp, torch.zeros(6, dtype=torch.float32).to(imp.device)))
         #             idx = torch.cat((idx, torch.zeros(6, dtype=torch.int64).to(idx.device)))
-        #         GSNN_output =idx[torch.topk(imp, k=6).indices]
+        #         GSNN_output =idx[torch.topk(imp, k=1).indices]
                 
         #         if dataset_name != 'places365': 
         #             actions = get_actions(torch.cat((GSNN_output.detach().cpu(), active_idx)), KG_path)
@@ -201,13 +203,15 @@ def train(configs):
         for VISOR_bboxs,objs in tqdm(test_dataloader):
             verbs = torch.tensor([KG_vocab.index(obj[1]) for obj in objs])
             # print(verbs)
-            GSNN_outputs = []   
+            GSNN_outputs = []  
 
             for  bbox, obj in zip(VISOR_bboxs, objs):
                 verb = obj[1]
                 obj = obj[0]
+                
                 # print("Verb: ", verb)
-                SG_nodes, SG_Adj = generate_SG_from_bboxs(bbox, 10000) 
+
+                SG_nodes, SG_Adj = generate_SG_from_bboxs(bbox, 1000) 
                 # print(SG_nodes)
                 # visualize_graph(SG_nodes, SG_Adj)
                 # active_idxs.append(SG_nodes)
@@ -222,6 +226,13 @@ def train(configs):
                 active_idxs.append(act_arr)
 
                 imp, idx = model(KG_embeddings, KG_adjacency_matrix, active_idx)
+
+                for i, node in enumerate(idx):
+                    if KG_vocab[node] in KG_nodes['objects'][0]:
+                       imp[i] = 0 
+                
+                # print(imp)
+
                 onehot = torch.where(idx == torch.tensor(KG_vocab.index(verb)), torch.ones_like(imp), torch.zeros_like(imp))
 
 
@@ -231,19 +242,19 @@ def train(configs):
                     imp = torch.cat((imp, torch.zeros(6, dtype=torch.float32).to(imp.device)))
                     idx = torch.cat((idx, torch.zeros(6, dtype=torch.int64).to(idx.device)))
 
-                GSNN_output =idx[torch.topk(imp, k=2).indices]
+                GSNN_output =idx[torch.topk(imp, k=1).indices]
 
-                # if KG_vocab[GSNN_output[0]] != 'None':
-                #     predicted_verbs.append(KG_vocab[GSNN_output[0]])
-                # else:
-                #     predicted_verbs.append(KG_vocab[GSNN_output[1]])
+                if KG_vocab[GSNN_output[0]] != 'None':
+                    predicted_verbs.append(KG_vocab[GSNN_output[0]])
+                else:
+                    predicted_verbs.append(KG_vocab[GSNN_output[1]])
 
-                predicted_verbs.append([[KG_vocab[GSNN_output[i]] for i in range(2)], torch.topk(imp, k=6).values])
+                # predicted_verbs.append([[KG_vocab[GSNN_output[i]] for i in range(2)], torch.topk(imp, k=6).values])
                 actual_verbs.append(verb)
 
 
                 actions = get_actions(torch.cat((GSNN_output.detach().cpu(), active_idx)), KG_path)
-                # print(actions)
+                # # print(actions)
                 # for node in GSNN_output.detach().int():
                 #     print(KG_vocab[node])
                 GSNN_outputs.append(GSNN_output) 

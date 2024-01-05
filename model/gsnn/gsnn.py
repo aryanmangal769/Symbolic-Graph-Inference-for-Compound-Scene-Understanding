@@ -4,6 +4,7 @@ from model.graph_models.gcn import GCN
 from model.gsnn.importance_net import Importance_net
 from utils.graph_utils import get_neighbour_nodes
 import torch.nn.functional as F
+import pdb
 
 
 
@@ -12,38 +13,81 @@ class GSNN(nn.Module):
     GSNN: Graph Search Neural Network
     '''
 
-    def __init__(self, config):
+    def __init__(self, config, KG_vocab, KG_nodes):
         super().__init__()
         self.config = config
+        self.KG_vocab = KG_vocab
+        self.KG_nodes = KG_nodes
 
         nfeat = config['gcn']['n_feat']
         nhid = config['gcn']['n_hid']
         nout = config['gcn']['n_out']
         dropout = config['gcn']['dropout']
         n_layers = config['gcn']['n_layers']
+        self.n_steps = config['gsnn']['n_steps']
+        self.step_threshold = config['gsnn']['step_threshold']
 
-        self.gcn = GCN(nfeat, nhid, nout,n_layers, dropout)
-        self.imp = Importance_net(nout)
+        self.gcns = nn.ModuleList([GCN(nfeat, nhid, nout, n_layers, dropout) for _ in range(self.n_steps)])
+        self.imps = nn.ModuleList([Importance_net(nout) for _ in range(self.n_steps)])
+        
+        self._avg_steps = 0
 
-    def forward(self, x, adj, active_idx):
+        # self.gcn = GCN(nfeat, nhid, nout,n_layers, dropout)
+        # self.imp = Importance_net(nout)
+
+    def forward(self, x, adj, active_idx_init):
         '''
         x: Knowledge graph embedding
         adj: Adjacency matrix of the knowledge graph
         active_idx: Active node index
         '''
+
+        active_idx = active_idx_init
+        
+        for step in range(self.n_steps -1):
+            neighbor_idx = get_neighbour_nodes(adj, active_idx)
+            # for node in active_idx:
+            #     print(self.KG_vocab[node])
+
+            # print("#####")
+                            
+            neighbor_idx = torch.tensor([node for node in neighbor_idx if self.KG_vocab[node] in self.KG_nodes['objects'][0]]).to(x.device)
+
+            # for node in neighbor_idx:
+            #     print(self.KG_vocab[node])
+            # print("#####")
+
+            current_idx = torch.cat(( active_idx, neighbor_idx)) 
+            # print(current_idx)
+            h = self.gcns[step](x[current_idx, :].clone(), adj[current_idx][:, current_idx].clone())
+
+            imp = self.imps[step](h, adj[current_idx][:,current_idx])
+
+            if self.step_threshold *torch.max(imp[:len(active_idx)]) > torch.topk(imp[len(active_idx):], 1).values[0]:
+                break
+
+            # self._avg_steps += 1
+            # print(self._avg_steps)
+            try:
+                active_idx = torch.cat((active_idx, neighbor_idx[torch.topk(imp[len(active_idx):], 1).indices]))
+                # print(self.KG_vocab[neighbor_idx[torch.topk(imp[len(active_idx):], 1).indices][0]])
+            except:
+                continue
+
+            # print("#####")
+            # print(active_idx)
+
+
         neighbor_idx = get_neighbour_nodes(adj, active_idx)
+        neighbor_idx = torch.tensor([node for node in neighbor_idx if self.KG_vocab[node] not in self.KG_nodes['objects'][0]]).to(x.device)
         # print(torch.sum(x, dim=1))
         current_idx = torch.cat(( active_idx, neighbor_idx)) 
-        h = self.gcn(x[current_idx, :].clone(), adj[current_idx][:, current_idx].clone())
+        h = self.gcns[-1](x[current_idx, :].clone(), adj[current_idx][:, current_idx].clone())
         # print(torch.sum(h, dim=1))
 
-        imp = self.imp(h, adj[current_idx][:,current_idx])
-        # print(imp)
+        imp = self.imps[-1](h, adj[current_idx][:,current_idx])
+        # # print(imp)
+        imp = F.normalize(imp, p=1, dim=0)
 
-        # imp = F.normalize(imp, p=1, dim=0)
-        # values, indices = torch.topk(imp[len(active_idx):], k=3)
-        # print(values.requires_grad)
-
-        # return values, neighbor_idx[indices].float().requires_grad_(True)
-        return imp[len(active_idx):], neighbor_idx
+        return imp[len(active_idx):], current_idx[len(active_idx):]
 

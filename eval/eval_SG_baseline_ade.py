@@ -22,7 +22,7 @@ with open(file_path, 'rb') as f:
     loaded_data = pickle.load(f)
 
 # Unpack the loaded data
-active_idxs, actual_verbs, predicted_verbs = loaded_data
+active_idxs, actual_verbs = loaded_data
 
 # base_dir = "/data/aryan/Seekg/Datasets/places365/Object_annotations"
 with open("images_per_class.pkl", "rb") as file:
@@ -40,10 +40,8 @@ def classify_image(objects, top_objects_per_class):
     category_counts = Counter()
     objects = [obj.split('_')[0] for obj in objects]
     for category in top_objects_per_class.keys():
-        top_objects = top_objects_per_class[category].most_common(11)   
-        if category=='skyscraper':
-            print(top_objects)
-            sys.exit()
+        top_objects = top_objects_per_class[category].most_common()   
+    
         top_objects = [obj[0] for obj in top_objects]
         common_objects = set(objects) & set(top_objects)
         # print(common_objects)
@@ -51,7 +49,7 @@ def classify_image(objects, top_objects_per_class):
 
     # print(category_counts)
     # Get the category with the highest count
-    print(category_counts)
+    # print(category_counts)
     classified_category = [obj[0] for obj in category_counts.most_common(1)]
     # print(classified_category)
     return classified_category
@@ -64,8 +62,8 @@ for i , objects_per_image in enumerate(active_idxs):
     category = classify_image(objects_per_image, top_objects_per_class)
     # print( category)
     # print(actual_verbs[i])
-    print(predicted_verbs[i])
-    print("#####")
+    # print(predicted_verbs[i])
+    # print("#####")
     classified_categories.append(category)
 
 # print(classified_categories)

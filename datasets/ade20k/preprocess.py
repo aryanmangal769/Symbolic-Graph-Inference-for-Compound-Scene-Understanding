@@ -124,10 +124,27 @@ for i in tqdm(range(nfiles)):
         if scene_name == '/isc':
             continue
 
+        # remove ambiguous scenes 
+        if scene_name == '/home_office':
+            scene_name = '/office'
+        if scene_name == '/attic':
+            scene_name = '/bedroom'
+        if scene_name == '/waiting_room':
+            scene_name = '/living_room'
+        if scene_name == '/mountaion_snowy':
+            scene_name = '/mountain'
+        if scene_name == '/hotel_room':
+            scene_name = '/bedroom'
+        if scene_name == '/building_facade':
+            scene_name = '/skyscraper'
+        
+        # if scene_name == '/highway':
+        #     continue
+
         # Create a dictionary for image information
         image_info_dict[file_name] = {
             'scene_name': scene_name,
-            'most_common_object_name': scene_objects_counter[scene_name].most_common(1)[0][0],
+            'most_common_object_name': scene_objects_counter[scene_name].most_common(3)[1][0],
             'object_bboxes': [(min(poly['x']), min(poly['y']), max(poly['x']), max(poly['y']))  for poly in filtered_polygons],
             'object_names': filtered_objects
         }

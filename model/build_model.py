@@ -2,11 +2,11 @@ import torch
 import torch.nn as nn
 from model.gsnn.gsnn import GSNN
 
-def build_gsnn(configs):
+def build_gsnn(configs, KG_vocab, KG_nodes):
     num_gpu = configs['num_gpu']
     use_gpu = (len(num_gpu) > 0)
     pretrained_model_path = configs['gsnn_path']
-    model = GSNN(configs)
+    model = GSNN(configs, KG_vocab, KG_nodes)
 
     if use_gpu:
         model = model.to(torch.device('cuda:{}'.format(num_gpu[0])))

@@ -6,9 +6,10 @@ import pickle as pkl
 import utils_ade20k
 import pdb
 from collections import Counter
+import sys
 
 # Load index with global information about ADE20K
-DATASET_PATH = '/data/aryan/Seekg/Datasets/ADE20k/ADE20K_2021_17_01/'
+DATASET_PATH = '/data/aryan/Seekg/Datasets/ade20k/ADE20K_2021_17_01/'
 index_file = 'index_ade20k.pkl'
 with open('{}/{}'.format(DATASET_PATH, index_file), 'rb') as f:
     index_ade20k = pkl.load(f)
@@ -55,6 +56,31 @@ top_scenes, counts = zip(*scenes.items())
 # plt.show()
 # plt.savefig('ADE_scene_histogram.png')
 
+
+highway_indices = []
+count = 0
+
+for i, scene in enumerate(index_ade20k["scene"]):
+    # print(scene)
+    if scene == "/living_room":
+        print("#")
+        highway_indices.append(i)
+        count += 1
+
+        if count == 5:
+            break
+
+for scene in highway_indices:
+    root_path = DATASET_PATH.replace('ADE20K_2021_17_01/', '')
+    full_file_name = '{}/{}'.format(index_ade20k['folder'][i], index_ade20k['filename'][scene])
+    try:
+        info = utils_ade20k.loadAde20K('{}/{}'.format(root_path, full_file_name))
+    except:
+        continue
+
+    print(info['img_name'])
+
+sys.exit()
 
 
 
