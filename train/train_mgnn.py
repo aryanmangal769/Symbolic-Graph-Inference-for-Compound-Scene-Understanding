@@ -11,13 +11,13 @@ import yaml
 import pickle
 from tqdm import tqdm
 
-from model.build_model import build_gsnn 
+from model.build_model import build_gsnn , build_mgsnn
 from model.mgnn.mgnn_loss import MGNNLoss
 from datasets.epic_kitchens import EPIC_Kitchens
 from datasets.places_365 import PLACES_365
 from datasets.ade20k import ADE_20k
 from utils.dataset_utils import custom_collate
-from utils.scene_graph_utils import generate_SG_from_bboxs, get_KG_active_idx, visualize_graph
+from utils.scene_graph_utils import generate_SG_from_bboxs, get_KG_active_idx, visualize_graph, get_SG_active_idx
 from utils.vis_utils import visualize_bbox
 import numpy as np
 import pdb
@@ -116,12 +116,17 @@ def train(configs):
     train_dataloader = DataLoader(train_set, batch_size=batch_size, shuffle=True, num_workers=8, collate_fn=custom_collate)
     test_dataloader = DataLoader(test_set, batch_size=batch_size, shuffle=True, num_workers=8, collate_fn=custom_collate)
     
-    model = build_gsnn(configs,KG_vocab, KG_nodes)
-    model.train()
+    # model = build_gsnn(configs,KG_vocab, KG_nodes)
+    # model.train()
+    # optimizer = torch.optim.Adam(model.parameters(), lr=lr)
+
+
+    model_mgsnn = build_mgsnn(configs,KG_vocab, KG_nodes)
+    model_mgsnn.train()
+    optimizer = torch.optim.Adam(model_mgsnn.parameters(), lr=lr)
     
     mgnn_loss = MGNNLoss(alpha=alpha)
     MSE_loss = nn.MSELoss()
-    optimizer = torch.optim.Adam(model.parameters(), lr=lr)
 
     KG_embeddings = KG_embeddings.requires_grad_(True)
     KG_adjacency_matrix = KG_adjacency_matrix.requires_grad_(True)
@@ -147,12 +152,14 @@ def train(configs):
 
 
         #         active_idx = get_KG_active_idx(SG_nodes, SG_Adj, KG_vocab , obj)
+        #         active_SG_idx = get_SG_active_idx(SG_nodes, SG_Adj, KG_vocab , obj)
         #         # print(active_idx)
 
         #         # for node in active_idx:
         #         #     print(KG_vocab[node])
         #         # print("####")
-        #         imp, idx = model(KG_embeddings, KG_adjacency_matrix, active_idx)
+        #         imp, idx = model_mgsnn(KG_embeddings, KG_adjacency_matrix, SG_Adj,[active_idx, active_SG_idx])
+        #         # imp, idx = model(KG_embeddings, KG_adjacency_matrix, active_idx)
         #         # print(imp)
         #         onehot = torch.where(idx == torch.tensor(KG_vocab.index(verb)), torch.ones_like(imp), torch.zeros_like(imp))
         #         # for node in idx:
@@ -217,6 +224,8 @@ def train(configs):
                 # active_idxs.append(SG_nodes)
 
                 active_idx = get_KG_active_idx(SG_nodes, SG_Adj, KG_vocab , obj)
+                active_SG_idx = get_SG_active_idx(SG_nodes, SG_Adj, KG_vocab , obj)
+
                 # print(active_idx)
 
                 act_arr = []
@@ -225,7 +234,8 @@ def train(configs):
                     # print(KG_vocab[node])
                 active_idxs.append(act_arr)
 
-                imp, idx = model(KG_embeddings, KG_adjacency_matrix, active_idx)
+                imp, idx = model_mgsnn(KG_embeddings, KG_adjacency_matrix, SG_Adj,[active_idx, active_SG_idx])
+                # imp, idx = model(KG_embeddings, KG_adjacency_matrix, active_idx)
 
                 for i, node in enumerate(idx):
                     if KG_vocab[node] in KG_nodes['objects'][0]:
