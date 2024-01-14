@@ -56,6 +56,8 @@ def getKitchenRelation_automatic(dataset_path):
                         relations.append([obj[0], objects[j][0]])
             
             # relations.append(['None', obj[0]])
+        # tools.append(['dogsled_multiple','dog'])
+        # tools.append(['dogsled_multiple','sled'])
     return relations, affordances, tools
 
 
@@ -73,8 +75,8 @@ def makeGraph():
         'tools': [list(set([item[1] for item in tools]))],
     }
 
-    # with open('/data/aryan/Seekg/Datasets/ade20k/ade_KG.pkl', 'wb') as f:
-    #     pickle.dump((embeddings, adjacency_matrix, vocab,nodes), f)
+    with open('/data/aryan/Seekg/Datasets/ade20k/ade_KG.pkl', 'wb') as f:
+        pickle.dump((embeddings, adjacency_matrix, vocab,nodes), f)
     
 
 

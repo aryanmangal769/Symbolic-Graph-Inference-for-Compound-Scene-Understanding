@@ -252,7 +252,7 @@ def train(configs):
                     imp = torch.cat((imp, torch.zeros(6, dtype=torch.float32).to(imp.device)))
                     idx = torch.cat((idx, torch.zeros(6, dtype=torch.int64).to(idx.device)))
 
-                GSNN_output =idx[torch.topk(imp, k=1).indices]
+                GSNN_output =idx[torch.topk(imp, k=5).indices]
 
                 if KG_vocab[GSNN_output[0]] != 'None':
                     predicted_verbs.append(KG_vocab[GSNN_output[0]])

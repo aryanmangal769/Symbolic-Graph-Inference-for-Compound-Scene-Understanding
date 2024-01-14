@@ -17,6 +17,6 @@ gcn:
   dropout: 0.5
 
 gsnn:
-  n_steps: 2
+  n_steps: 1
   step_threshold: 0.85
   

@@ -65,6 +65,7 @@ def get_SG_active_idx(SG_nodes, SG_Adj, KG_vocab , obj):
     active_idx = []
     active_nodes = []
     SG_nodes = [node.split('_')[0] for node in SG_nodes]
+    SG_Adj_neighbours = SG_Adj.clone()
 
     # Find the index of the object in KG_vocab
     # obj_idx = KG_vocab.index(obj)
@@ -75,6 +76,8 @@ def get_SG_active_idx(SG_nodes, SG_Adj, KG_vocab , obj):
         # print("Object not in scene graph, taking the first object at the principal object")
     
     active_idx.append(SG_nodes.index(obj))
+    if obj in get_neighbour_nodes(SG_Adj, SG_nodes,SG_nodes.index(obj)):
+        SG_Adj_neighbours[SG_nodes.index(obj), SG_nodes.index(obj)] = 1
 
     neighbors = torch.nonzero(SG_Adj[SG_nodes.index(obj)])
 
@@ -85,6 +88,8 @@ def get_SG_active_idx(SG_nodes, SG_Adj, KG_vocab , obj):
         try :
             if SG_nodes[neighbor] not in active_nodes:
                 active_idx.append(neighbor)
+                if SG_nodes[neighbor] in get_neighbour_nodes(SG_Adj,SG_nodes, neighbor):
+                    SG_Adj_neighbours[neighbor, neighbor] = 1
                 active_nodes.append(SG_nodes[neighbor])
         except:
             continue
@@ -93,6 +98,48 @@ def get_SG_active_idx(SG_nodes, SG_Adj, KG_vocab , obj):
 
     # Remove duplicates and return the result
     return torch.tensor(active_idx)
+
+def update_SG_adj(SG_nodes, SG_Adj, KG_vocab , obj):
+    active_idx = []
+    active_nodes = []
+    SG_nodes = [node.split('_')[0] for node in SG_nodes]
+    SG_Adj_neighbours = SG_Adj.clone()
+
+    # Find the index of the object in KG_vocab
+    # obj_idx = KG_vocab.index(obj)
+
+    # Find the neighbors of the object in SG_Adj
+    if obj not in SG_nodes:  # If the object is not present in the scene graph we takes the first object as the principal object
+        obj = SG_nodes[0]
+        # print("Object not in scene graph, taking the first object at the principal object")
+    
+    active_idx.append(SG_nodes.index(obj))
+    if obj in get_neighbour_nodes(SG_Adj, SG_nodes,SG_nodes.index(obj)):
+        SG_Adj_neighbours[SG_nodes.index(obj), SG_nodes.index(obj)] = 1
+
+    neighbors = torch.nonzero(SG_Adj[SG_nodes.index(obj)])
+
+    # Find the indices of neighbors in KG_vocab
+    # neighbors_idx = [KG_vocab.index(SG_nodes[neighbor]) for neighbor in neighbors]
+    
+    for neighbor in neighbors:
+        try :
+            if SG_nodes[neighbor] not in active_nodes:
+                active_idx.append(neighbor)
+                if SG_nodes[neighbor] in get_neighbour_nodes(SG_Adj,SG_nodes, neighbor):
+                    SG_Adj_neighbours[neighbor, neighbor] = 1
+                active_nodes.append(SG_nodes[neighbor])
+        except:
+            continue
+    
+    # active_idx.extend(neighbors_idx)
+
+    # Remove duplicates and return the result
+    return SG_Adj_neighbours
+
+
+def get_neighbour_nodes(adj, nodes, node):
+    return [nodes[i] for i in torch.nonzero(adj[node])]
 
 def visualize_graph(nodes, adjacency_matrix):
     # Create a graph

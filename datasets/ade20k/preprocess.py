@@ -65,6 +65,21 @@ for i in tqdm(range(nfiles)):
         scene_name = '/'+scene_name
         if scene_name == '/isc':
             continue
+
+        if scene_name == '/home_office':
+            scene_name = '/office'
+        if scene_name == '/attic':
+            scene_name = '/bedroom'
+        if scene_name == '/waiting_room':
+            scene_name = '/living_room'
+        if scene_name == '/mountaon_snowy':
+            scene_name = '/mountain'
+        if scene_name == '/hotel_room':
+            scene_name = '/bedroom'
+        if scene_name == '/building_facade':
+            scene_name = '/skyscraper'
+        
+        print(scene_name)
         if scene_name not in scene_objects_counter:
             scene_objects_counter[scene_name] = Counter(filtered_objects)
         else:
@@ -131,7 +146,7 @@ for i in tqdm(range(nfiles)):
             scene_name = '/bedroom'
         if scene_name == '/waiting_room':
             scene_name = '/living_room'
-        if scene_name == '/mountaion_snowy':
+        if scene_name == '/mountain_snowy':
             scene_name = '/mountain'
         if scene_name == '/hotel_room':
             scene_name = '/bedroom'

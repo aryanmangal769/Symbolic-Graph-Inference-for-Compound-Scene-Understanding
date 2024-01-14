@@ -89,6 +89,12 @@ class MGSNN(nn.Module):
         # print(torch.sum(h, dim=1))
 
         imp = self.imps[-1](h, adj[current_idx][:,current_idx])
+
+        for i,node in enumerate(neighbor_idx):
+            if 'multiple' in self.KG_vocab[node] and (torch.diagonal(SG_adj) != 1).any().item():
+                imp[len(active_idx)+i] = 0
+            elif 'single' in self.KG_vocab[node] and torch.any(torch.diagonal(SG_adj) == 1):
+                imp[len(active_idx)+i] = 0
         # # print(imp)
         imp = F.normalize(imp, p=1, dim=0)
 
