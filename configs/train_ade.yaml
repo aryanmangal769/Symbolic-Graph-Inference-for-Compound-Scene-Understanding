@@ -1,13 +1,16 @@
 dataset: ade20k
 base_dir: '/data/aryan/Seekg/MGNN/datasets/ade20k/image_info_dict.pkl'
+data_dir: '/data/aryan/Seekg/Datasets/ade20k/ADE20K_2021_17_01/images'
 subset_path: ''
 KG_path: '/data/aryan/Seekg/Datasets/ade20k/ade_KG.pkl'
 
 gsnn_path: ''
-epochs: 100
+# vit_path: '/data/aryan/Seekg/MGNN/results/vit.pth'
+vit_path: ''
+epochs: 5
 batch_size: 1
 alpha: 0.1
-lr: 0.000001
+lr: 0.0000001
 
 gcn:
   n_feat: 100
@@ -17,6 +20,6 @@ gcn:
   dropout: 0.5
 
 gsnn:
-  n_steps: 1
-  step_threshold: 0.85
+  n_steps: 2
+  step_threshold: 0.98
   

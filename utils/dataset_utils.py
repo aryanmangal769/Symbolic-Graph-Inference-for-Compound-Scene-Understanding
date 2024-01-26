@@ -5,8 +5,10 @@ import numpy as np
 def custom_collate(batch):
     data = [item[0] for item in batch]
     target = [item[1] for item in batch]
+    img = [item[2] for item in batch]
+
     # target = torch.LongTensor(target)
-    return [data, target]
+    return [data, target, img]
 
 def get_bbox_from_segment(annot):
     mask_clean = []

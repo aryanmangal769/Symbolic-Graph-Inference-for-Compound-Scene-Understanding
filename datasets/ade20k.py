@@ -7,18 +7,28 @@ from tqdm import tqdm
 sys.path.append('.')
 import pickle
 import ijson
+from torchvision import transforms
+from PIL import Image
+
 
 from utils.dataset_utils import get_bbox_from_segment
+
+def find_file(file_name, search_folder):
+    for root, dirs, files in os.walk(search_folder):
+        if file_name in files:
+            return os.path.join(root, file_name)
 
 class ADE_20k(Dataset):
     def __init__(self,
                 base_dir : str,
-                subset_path : str,
+                data_dir : str,
                 split : str = 'train',
                 split_size : int = 0.8
                 ):
         super().__init__()
         self.base_dir = base_dir
+        self.data_dir = data_dir
+        self.transform = transforms.Compose([transforms.Resize((224, 224)), transforms.ToTensor(),])
         self._load_dataset()
 
     def _load_dataset(self):
@@ -54,14 +64,18 @@ class ADE_20k(Dataset):
         return bbox_formated
 
     def __len__(self):
-        return len(self.paths)
+        return int(len(self.paths))
 
     def __getitem__(self, idx):
         path = self.paths[idx]
+        path = find_file(path, self.data_dir)
+        img = Image.open(path).convert("RGB")
+        img = self.transform(img)
+        # img = None
         # print(path)
         obj = self.objects[idx]
         verb = self.verbs[idx]
         bbox = self.bboxes[idx]
-        return  [bbox,(obj, verb)]
+        return  [bbox,(obj, verb), img]
 
         

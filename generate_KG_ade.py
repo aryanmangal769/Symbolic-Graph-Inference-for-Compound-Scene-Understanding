@@ -72,7 +72,7 @@ def makeGraph():
     nodes = {
         'objects': [list(set([item for sublist in relations for item in sublist]+[sublist[0] for sublist in affordances]+[sublist[1] for sublist in tools]))],
         'affordances': [list(set([item[1] for item in affordances]))],
-        'tools': [list(set([item[1] for item in tools]))],
+        'tools': [list(set([item[0] for item in tools]))],
     }
 
     with open('/data/aryan/Seekg/Datasets/ade20k/ade_KG.pkl', 'wb') as f:

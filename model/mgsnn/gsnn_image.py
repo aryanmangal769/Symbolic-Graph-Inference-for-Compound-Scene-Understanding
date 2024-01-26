@@ -1,6 +1,7 @@
 import torch
 import torch.nn as nn
 from model.graph_models.gcn import GCN
+from model.graph_models.gcn_image import GCNI
 from model.mgsnn.importance_net import Importance_net
 from utils.graph_utils import get_neighbour_nodes, merge_graphs
 import torch.nn.functional as F
@@ -24,10 +25,14 @@ class MGSNN(nn.Module):
         nout = config['gcn']['n_out']
         dropout = config['gcn']['dropout']
         n_layers = config['gcn']['n_layers']
+        self.image_conditioning = config['gcn']['image_conditioning']
         self.n_steps = config['gsnn']['n_steps']
         self.step_threshold = config['gsnn']['step_threshold']
-
-        self.gcns = nn.ModuleList([GCN(nfeat, nhid, nout, n_layers, dropout) for _ in range(self.n_steps)])
+        
+        if self.image_conditioning:
+            self.gcns = nn.ModuleList([GCNI(nfeat, nhid, nout, n_layers, dropout) for _ in range(self.n_steps)])
+        else:
+            self.gcns = nn.ModuleList([GCN(nfeat, nhid, nout, n_layers, dropout) for _ in range(self.n_steps)])
         self.imps = nn.ModuleList([Importance_net(nout) for _ in range(self.n_steps)])
         
         self._avg_steps = 0
@@ -35,7 +40,7 @@ class MGSNN(nn.Module):
         # self.gcn = GCN(nfeat, nhid, nout,n_layers, dropout)
         # self.imp = Importance_net(nout)
 
-    def forward(self, x, KG_adj, SG_adj, active_idx_init):
+    def forward(self, x, KG_adj, SG_adj, active_idx_init, img_feat):
         '''
         x: Knowledge graph embedding
         adj: Adjacency matrix of the knowledge graph
@@ -61,7 +66,11 @@ class MGSNN(nn.Module):
 
             current_idx = torch.cat(( active_idx, neighbor_idx)) 
             # print(current_idx)
-            h = self.gcns[step](x[current_idx, :].clone(), adj[current_idx][:, current_idx].clone())
+            
+            if self.image_conditioning:
+                h = self.gcns[step](x[current_idx, :].clone(), adj[current_idx][:, current_idx].clone(), img_feat)
+            else:
+                h = self.gcns[step](x[current_idx, :].clone(), adj[current_idx][:, current_idx].clone())
 
             imp = self.imps[step](h, adj[current_idx][:,current_idx])
 
@@ -85,7 +94,10 @@ class MGSNN(nn.Module):
         neighbor_idx = torch.tensor([node for node in neighbor_idx if self.KG_vocab[node] not in self.KG_nodes['objects'][0]]).to(x.device)
         # print(torch.sum(x, dim=1))
         current_idx = torch.cat(( active_idx, neighbor_idx)) 
-        h = self.gcns[-1](x[current_idx, :].clone(), adj[current_idx][:, current_idx].clone())
+        if self.image_conditioning:
+            h = self.gcns[step](x[current_idx, :].clone(), adj[current_idx][:, current_idx].clone(), img_feat)
+        else:
+            h = self.gcns[step](x[current_idx, :].clone(), adj[current_idx][:, current_idx].clone())       
         # print(torch.sum(h, dim=1))
 
         imp = self.imps[-1](h, adj[current_idx][:,current_idx])

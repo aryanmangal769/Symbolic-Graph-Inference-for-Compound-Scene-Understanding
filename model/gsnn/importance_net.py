@@ -20,7 +20,7 @@ class Importance_net(nn.Module):
         h = self.relu(h)
         # h = self.tanh(h)
 
-        h = F.normalize(h, p=1, dim=1)
+        # h = F.normalize(h, p=1, dim=1)
 
         h = A@h
         h = torch.sum(h,1)

@@ -50,7 +50,7 @@ def classify_image(objects, top_objects_per_class):
     # print(category_counts)
     # Get the category with the highest count
     # print(category_counts)
-    classified_category = [obj[0] for obj in category_counts.most_common(1)]
+    classified_category = [obj[0] for obj in category_counts.most_common(5)]
     # print(classified_category)
     return classified_category
 

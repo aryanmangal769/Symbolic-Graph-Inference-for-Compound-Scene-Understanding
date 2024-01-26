@@ -43,20 +43,27 @@ print("The most common object is object {} ({}), which appears {} times".format(
 scene_counter =Counter(index_ade20k['scene'])
 scenes = dict(scene_counter.most_common(30))
 
+# Scenes to be removed
+scenes_to_remove = ['/home_office', '/attic', '/waiting_room', '/mountain_snowy', '/hotel_room', '/building_facade', 'isc', 'bedrooom', 'living_room', 'bathroom']
+
+# Remove specified scenes from the dictionary
+for scene_name in scenes_to_remove:
+    scenes.pop(scene_name, None)
+
 # Plotting histogram for the 30 most common scenes
 top_scenes, counts = zip(*scenes.items())
 
-# plt.figure(figsize=(12, 6))
-# plt.bar(scenes, counts, color='skyblue')
-# plt.xlabel('Scene')
-# plt.ylabel('Count')
-# plt.title('Top 30 Scene Distribution in ADE20K Dataset')
-# plt.xticks(rotation=45, ha='right')
-# plt.tight_layout()
-# plt.show()
-# plt.savefig('ADE_scene_histogram.png')
+plt.figure(figsize=(12, 6))
+plt.bar(top_scenes, counts, color='skyblue')
+plt.xlabel('Scene')
+plt.ylabel('Count')
+plt.title('Scene Distribution in ADE20K Dataset')
+plt.xticks(rotation=45, ha='right')
+plt.tight_layout()
+plt.show()
+plt.savefig('ADE_scene_histogram.png')
 
-
+sys.exit()
 highway_indices = []
 count = 0
 

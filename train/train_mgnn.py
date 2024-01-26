@@ -11,7 +11,7 @@ import yaml
 import pickle
 from tqdm import tqdm
 
-from model.build_model import build_gsnn , build_mgsnn
+from model.build_model import build_gsnn , build_mgsnn, build_vit
 from model.mgnn.mgnn_loss import MGNNLoss
 from datasets.epic_kitchens import EPIC_Kitchens
 from datasets.places_365 import PLACES_365
@@ -24,7 +24,10 @@ import pdb
 from sklearn.metrics import f1_score
 import seaborn as sns
 from sklearn.metrics import confusion_matrix
+import torchvision.transforms as transforms
 import matplotlib.pyplot as plt
+import random
+import os
 
 
 def get_actions(idx, KG_path ):
@@ -86,13 +89,6 @@ def train(configs):
         KG_embeddings, KG_adjacency_matrix, KG_vocab, KG_nodes = pickle.load(f)
     
     KG_embeddings = F.normalize(KG_embeddings, p=1, dim=1)
-    
-    # for embedding in KG_embeddings:
-    #     print(torch.sum(embedding))
-    # sys.exit()
-    
-    # sys.exit()
-    # pdb.set_trace()
 
     print(len(KG_vocab))
         
@@ -101,10 +97,12 @@ def train(configs):
     if dataset_name == 'places365':
         dataset = PLACES_365(base_dir, subset_path)
     elif dataset_name == 'ade20k':
-        dataset = ADE_20k(base_dir, subset_path)
+        dataset = ADE_20k(base_dir, configs['data_dir'])
     else:
         dataset = EPIC_Kitchens(base_dir, subset_path)
     
+    random.seed(40)
+    torch.manual_seed(40)
 
     dataset_size = len(dataset)
     train_size = int(0.7 * dataset_size)
@@ -124,6 +122,11 @@ def train(configs):
     model_mgsnn = build_mgsnn(configs,KG_vocab, KG_nodes)
     model_mgsnn.train()
     optimizer = torch.optim.Adam(model_mgsnn.parameters(), lr=lr)
+    num_classes = len(KG_nodes['tools'][0])
+    configs['num_classes'] = num_classes
+    model_vit = build_vit(configs)
+    ce_loss = nn.CrossEntropyLoss()
+    vit_optimizer = torch.optim.Adam(model_vit.parameters(), lr=1e-4)
     
     mgnn_loss = MGNNLoss(alpha=alpha)
     MSE_loss = nn.MSELoss()
@@ -137,11 +140,11 @@ def train(configs):
         # predicted_verbs = []
         # actual_verbs = []
 
-        # for VISOR_bboxs,objs in tqdm(train_dataloader):
+        # for VISOR_bboxs,objs,imgs in tqdm(train_dataloader):
         #     verbs = torch.tensor([KG_vocab.index(obj[1]) for obj in objs])
 
         #     GSNN_outputs = []   
-        #     for  bbox, obj in zip(VISOR_bboxs, objs):
+        #     for  bbox, obj , img in zip(VISOR_bboxs, objs , imgs):
         #         verb = obj[1]
         #         obj = obj[0]
         #         # print("Verb: ", verb)
@@ -166,8 +169,6 @@ def train(configs):
         #         #     print(KG_vocab[node])
         #         # print(onehot)
 
-        #         # print(imp)
-        #         # print(onehot)
         #         loss = MSE_loss(imp, onehot.float())
         #         optimizer.zero_grad()
         #         loss.backward(retain_graph=True)   
@@ -176,7 +177,23 @@ def train(configs):
         #         if imp.shape[0] < 6:
         #             imp = torch.cat((imp, torch.zeros(6, dtype=torch.float32).to(imp.device)))
         #             idx = torch.cat((idx, torch.zeros(6, dtype=torch.int64).to(idx.device)))
-        #         GSNN_output =idx[torch.topk(imp, k=1).indices]
+
+        #         vit_output = model_vit(img.unsqueeze(0))
+        #         vit_output = vit_output.squeeze(0)
+
+        #         vit_onehot = torch.tensor([float(tool == verb) for tool in KG_nodes['tools'][0]], dtype=torch.float32).to(vit_output.device)
+        #         loss = ce_loss(vit_output, vit_onehot)
+        #         vit_optimizer.zero_grad()
+        #         loss.backward(retain_graph=True)
+        #         vit_optimizer.step()
+        #         idx_vit = torch.tensor([KG_vocab.index(verb) for verb in KG_nodes['tools'][0]]).to(vit_output.device)
+
+
+        #         # for i,id in enumerate(idx):
+        #         #     vit_output[idx_vit.index(id)] += imp[i]
+
+        #         GSNN_output =idx_vit[torch.topk(vit_output, k=1).indices]
+        #         # GSNN_output =idx[torch.topk(imp, k=1).indices]
                 
         #         if dataset_name != 'places365': 
         #             actions = get_actions(torch.cat((GSNN_output.detach().cpu(), active_idx)), KG_path)
@@ -207,12 +224,36 @@ def train(configs):
         actual_verbs = []
         active_idxs = []
 
-        for VISOR_bboxs,objs in tqdm(test_dataloader):
+        verb_counts = {}
+
+        for VISOR_bboxs,objs, imgs in tqdm(test_dataloader):
             verbs = torch.tensor([KG_vocab.index(obj[1]) for obj in objs])
+
+            # current_verb = verbs[0].item()
+            # if current_verb in verb_counts:
+            #     verb_counts[current_verb] += 1
+            # else:
+            #     verb_counts[current_verb] = 1
+
+            # if verb_counts[current_verb] > 5:
+            #     continue
+
+            # # Get the image
+            # img = imgs[0]
+
+            # # Save the image to the corresponding verb folder
+            # verb_folder = os.path.join('results/gpt_vision', KG_vocab[current_verb].replace('/', ''))
+            # os.makedirs(verb_folder, exist_ok=True)
+            # img_path = os.path.join(verb_folder, f"image_{verb_counts[current_verb]}.png")
+            # img_pil = transforms.ToPILImage()(img)
+            # img_pil.save(img_path)
+
+
+
             # print(verbs)
             GSNN_outputs = []  
 
-            for  bbox, obj in zip(VISOR_bboxs, objs):
+            for  bbox, obj, img in zip(VISOR_bboxs, objs, imgs):
                 verb = obj[1]
                 obj = obj[0]
                 
@@ -247,12 +288,23 @@ def train(configs):
 
 
                 loss = MSE_loss(imp, onehot.float())
+                
+                # vit_output = model_vit(img.unsqueeze(0))
+                # vit_output = vit_output.squeeze(0)
+                # idx_vit = torch.tensor([KG_vocab.index(verb) for verb in KG_nodes['tools'][0]]).to(vit_output.device)
 
+
+                # # GSNN_output =idx_vit[torch.topk(vit_output, k=1).indices]
+
+                # for i,id in enumerate(idx):
+                #     # vit_output[torch.where(idx_vit == id)[0]] += 10*imp[i]
+                #     imp[i] = imp[i]*1000 + vit_output[torch.where(idx_vit == id)[0]][0]
+                
                 if imp.shape[0] < 6:
                     imp = torch.cat((imp, torch.zeros(6, dtype=torch.float32).to(imp.device)))
                     idx = torch.cat((idx, torch.zeros(6, dtype=torch.int64).to(idx.device)))
+                GSNN_output =idx[torch.topk(imp, k=3).indices]
 
-                GSNN_output =idx[torch.topk(imp, k=5).indices]
 
                 if KG_vocab[GSNN_output[0]] != 'None':
                     predicted_verbs.append(KG_vocab[GSNN_output[0]])
@@ -267,6 +319,9 @@ def train(configs):
                 # # print(actions)
                 # for node in GSNN_output.detach().int():
                 #     print(KG_vocab[node])
+
+
+                
                 GSNN_outputs.append(GSNN_output) 
 
                 # sys.exit()
@@ -280,17 +335,17 @@ def train(configs):
             pickle.dump([active_idxs,  actual_verbs], f)        
         print("Epoch: ", epoch, " Loss: ", loss.item(), "test Accuracy: ", sum(test_accuracy)/len(test_accuracy))
         labels = np.unique(actual_verbs)
-        # print(labels )
+        print(labels )
         # print("F1 score: ", f1_score(actual_verbs, predicted_verbs,labels = labels, average=None))
-        cm = confusion_matrix(actual_verbs, predicted_verbs, labels=labels)
-        plt.figure(figsize=(10,10))
-        sns.heatmap(cm, annot=False, linewidths=.5, square=True, cmap='Blues_r',
-                    xticklabels=labels,
-                    yticklabels=labels)
-        plt.ylabel('Actual label')
-        plt.xlabel('Predicted label')
-        plt.title('Confusion matrix')
-        plt.savefig("results/confusion_matrix.png")
+        # cm = confusion_matrix(actual_verbs, predicted_verbs, labels=labels)
+        # plt.figure(figsize=(10,10))
+        # sns.heatmap(cm, annot=False, linewidths=.5, square=True, cmap='Blues_r',
+        #             xticklabels=labels,
+        #             yticklabels=labels)
+        # plt.ylabel('Actual label')
+        # plt.xlabel('Predicted label')
+        # plt.title('Confusion matrix')
+        # plt.savefig("results/confusion_matrix.png")
 
 
         # sys.exit()
