@@ -41,23 +41,25 @@ def getKitchenRelation_automatic(dataset_path):
         top_objects_per_class = pickle.load(file)
 
     for category in top_objects_per_class.keys():
-        objects = top_objects_per_class[category].most_common(15)   
+        objects = top_objects_per_class[category].most_common(25)   
+        # if category == '/living_room':
+        #     print(category)
         print(category)
         print(objects)
         # print(objects) 
         for i, obj in enumerate(objects):
-            if i < 11:
+            if i < 25:
                 tools.append([category, obj[0]])
         
         for i , obj in enumerate(objects):
-            if i < 11:
+            if i < 25:
                 for j in range(i+1, len(objects)):
                     if j < 11:
                         relations.append([obj[0], objects[j][0]])
             
             # relations.append(['None', obj[0]])
-        # tools.append(['dogsled_multiple','dog'])
-        # tools.append(['dogsled_multiple','sled'])
+        tools.append(['harbor','boat'])
+        tools.append(['harbor','water'])
     return relations, affordances, tools
 
 
@@ -75,7 +77,7 @@ def makeGraph():
         'tools': [list(set([item[0] for item in tools]))],
     }
 
-    with open('/data/aryan/Seekg/Datasets/ade20k/ade_KG.pkl', 'wb') as f:
+    with open('/data/aryan/Seekg/Datasets/ade20k/ade_KG_test.pkl', 'wb') as f:
         pickle.dump((embeddings, adjacency_matrix, vocab,nodes), f)
     
 

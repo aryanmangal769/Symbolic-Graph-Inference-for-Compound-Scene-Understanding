@@ -23,7 +23,7 @@ import torch
 import torchvision.transforms as T
 import torch.nn.functional as F
 from datasets.ade20k import ADE_20k
-from torchvision.models.detection import fasterrcnn_resnet50_fpn
+from torchvision.models.detection import fasterrcnn_resnet50_fpn_v2
 from PIL import Image
 import os
 from collections import defaultdict, Counter
@@ -101,7 +101,7 @@ def get_precision_recall(predictions, targets):
 
 CLASSES = ['__background__', 'person', 'bicycle', 'car', 'motorcycle', 'airplane', 'bus', 'train', 'truck', 'boat', 'traffic light', 'fire hydrant', 'N/A', 'stop sign', 'parking meter', 'bench', 'bird', 'cat', 'dog', 'horse', 'sheep', 'cow', 'elephant', 'bear', 'zebra', 'giraffe', 'N/A', 'backpack', 'umbrella', 'N/A', 'N/A', 'handbag', 'tie', 'suitcase', 'frisbee', 'skis', 'snowboard', 'sports ball', 'kite', 'baseball bat', 'baseball glove', 'skateboard', 'surfboard', 'tennis racket', 'bottle', 'N/A', 'wine glass', 'cup', 'fork', 'knife', 'spoon', 'bowl', 'banana', 'apple', 'sandwich', 'orange', 'broccoli', 'carrot', 'hot dog', 'pizza', 'donut', 'cake', 'chair', 'couch', 'potted plant', 'bed', 'N/A', 'dining table', 'N/A', 'N/A', 'toilet', 'N/A', 'tv', 'laptop', 'mouse', 'remote', 'keyboard', 'cell phone', 'microwave', 'oven', 'toaster', 'sink', 'refrigerator', 'N/A', 'book', 'clock', 'vase', 'scissors', 'teddy bear', 'hair drier', 'toothbrush']
 # Load the pre-trained Faster R-CNN model
-model = fasterrcnn_resnet50_fpn(pretrained=True)
+model = fasterrcnn_resnet50_fpn_v2(pretrained=True)
 model.eval()
 
 def get_bboxes_labels(image_path, min_objects=5):
@@ -128,7 +128,7 @@ def get_bboxes_labels(image_path, min_objects=5):
     category_bboxes_labels = defaultdict(list)
 
     for box, label, score in zip(boxes, labels, scores):
-        if score < 0.7:
+        if score < 0.3:
             continue
 
         # Add bounding box and label to the category
@@ -200,26 +200,101 @@ def train(configs):
     KG_embeddings = KG_embeddings.requires_grad_(True)
     KG_adjacency_matrix = KG_adjacency_matrix.requires_grad_(True)
 
-    img_path = '/data/aryan/Seekg/MGNN/results/image.png'
 
+    # For dogsled image
+    # img_path = '/data/aryan/Seekg/MGNN/results/image.png'
+
+    # bbox = get_bboxes_labels(img_path)
+    # # print(bbox)
+    # bbox_formated = []
+    # for obj in bbox:
+    #     for i, obj in enumerate(bbox[obj]):
+    #         print(obj['label'])
+    #         if obj['label'] == 'chair':
+    #             bbox_formated.append({'object': 'sled'+'_'+str(i), 'object_bbox': obj['bbox']})  
+    #         else:
+    #             bbox_formated.append({'object': obj['label']+'_'+str(i), 'object_bbox': obj['bbox']})  
+
+
+    # For garage
+    # img_path = '/data/aryan/Seekg/MGNN/results/test_images/garage.jpg'
+
+    # bbox = get_bboxes_labels(img_path)
+    # # print(bbox)
+    # bbox_formated = []
+    # for obj in bbox:
+    #     for i, obj in enumerate(bbox[obj]):
+    #         print(obj['label'])
+    #         # if obj['label'] == 'chair':
+    #         #     bbox_formated.append({'object': 'sled'+'_'+str(i), 'object_bbox': obj['bbox']})  
+    #         # else:
+    #         bbox_formated.append({'object': obj['label']+'_'+str(i), 'object_bbox': obj['bbox']})  
+
+
+    # #For gym
+    # img_path = '/data/aryan/Seekg/MGNN/results/test_images/gym.jpeg'
+
+    # bbox = get_bboxes_labels(img_path)
+    # # print(bbox)
+    # bbox_formated = []
+    # for obj in bbox:
+    #     for i, obj in enumerate(bbox[obj]):
+    #         print(obj['label'])
+    #         # if obj['label'] == 'chair':
+    #         #     bbox_formated.append({'object': 'sled'+'_'+str(i), 'object_bbox': obj['bbox']})  
+    #         # else:
+    #         bbox_formated.append({'object': obj['label']+'_'+str(i), 'object_bbox': obj['bbox']})  
+
+
+    #For harbor
+    # img_path = '/data/aryan/Seekg/MGNN/results/test_images/harbour.jpg'
+
+    # bbox = get_bboxes_labels(img_path)
+    # # print(bbox)
+    # bbox_formated = []
+    # for obj in bbox:
+    #     for i, obj in enumerate(bbox[obj]):
+    #         print(obj['label'])
+    #         # if obj['label'] == 'chair':
+    #         #     bbox_formated.append({'object': 'sled'+'_'+str(i), 'object_bbox': obj['bbox']})  
+    #         # else:
+    #         bbox_formated.append({'object': obj['label']+'_'+str(i), 'object_bbox': obj['bbox']})  
+
+    #For empty room
+    img_path = '/data/aryan/Seekg/MGNN/results/test_images_gpt_failure/empty_bedroom.jpg'
     bbox = get_bboxes_labels(img_path)
     # print(bbox)
     bbox_formated = []
     for obj in bbox:
         for i, obj in enumerate(bbox[obj]):
             print(obj['label'])
-            if obj['label'] == 'chair':
-                bbox_formated.append({'object': 'sled'+'_'+str(i), 'object_bbox': obj['bbox']})  
-            else:
-                bbox_formated.append({'object': obj['label']+'_'+str(i), 'object_bbox': obj['bbox']})  
+            # if obj['label'] == 'chair':
+            #     bbox_formated.append({'object': 'sled'+'_'+str(i), 'object_bbox': obj['bbox']})  
+            # else:
+            bbox_formated.append({'object': obj['label']+'_'+str(i), 'object_bbox': obj['bbox']})  
+ 
 
-    SG_nodes, SG_Adj = generate_SG_from_bboxs(bbox_formated, 800) 
+    SG_nodes, SG_Adj = generate_SG_from_bboxs(bbox_formated, 10000) 
+
+    ##For garage
+    # SG_nodes[3] = 'table_0'
+    # SG_nodes[5] = 'sofa_0'
+    # SG_nodes[0] = 'wall_0'
+    # SG_nodes[4] = 'floor_0'
+
+    # #For gym
+    # SG_nodes[3] = 'television_0'
+
+    # For empty Bedroom
+    SG_nodes[0] = 'door_0'
+
+
     print(SG_nodes)
     # SG_Adj[1,0] =0
     # SG_Adj[0,1] =0
     # visualize_graph(SG_nodes, SG_Adj)
 
-    obj ='dog'
+    obj ='door'
     active_idx = get_KG_active_idx(SG_nodes, SG_Adj, KG_vocab , obj)
     active_SG_idx = get_SG_active_idx(SG_nodes, SG_Adj, KG_vocab , obj)
     SG_Adj = update_SG_adj(SG_nodes, SG_Adj, KG_vocab , obj)
@@ -230,6 +305,10 @@ def train(configs):
     # print("####")
     
     imp, idx = model_mgsnn(KG_embeddings, KG_adjacency_matrix, SG_Adj,[active_idx, active_SG_idx])
+
+    for i, im in enumerate(imp.tolist()):
+        if im < 2  :
+            idx[i] = 0
     # print(imp)s
     # onehot = torch.where(idx == torch.tensor(KG_vocab.index(verb)), torch.ones_like(imp), torch.zeros_like(imp))
     # print(imp)
@@ -246,10 +325,13 @@ def train(configs):
 
     GSNN_output =idx[torch.topk(imp, k=1).indices]
     for node in GSNN_output.detach().int():
-        print(KG_vocab[node])
+        if KG_vocab[node] in ["/living_room",'/bedroom', '/kitchen', '/bathroom']:
+        # if KG_vocab[node] in ["harbor",'/lake', '/ocean', '/bathroom']:
+            print(KG_vocab[node])
+        # print(KG_vocab[node])
 
-    actions = get_actions(torch.cat((GSNN_output.detach().cpu(), active_idx)), KG_path)
-    print(actions)
+    # actions = get_actions(torch.cat((GSNN_output.detach().cpu(), active_idx)), KG_path)
+    # print(actions)
 
 
 

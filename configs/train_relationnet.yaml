@@ -1,0 +1,9 @@
+data_file: "/data/aryan/Seekg/MGNN/datasets/ade_relations/preprocessed_relations.pkl"
+model_save_path : "models/RelationNet/RelationNet_train.pkl"
+batch_size : 8
+num_epochs: 60
+learning_rate: 0.0001
+# input_dim: 2312
+input_dim: 1544
+hidden_dim: 256
+num_classes: 13

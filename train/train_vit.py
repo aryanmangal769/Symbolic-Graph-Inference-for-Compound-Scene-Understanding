@@ -96,10 +96,12 @@ def train(configs):
     # optimizer = torch.optim.Adam(model_mgsnn.parameters(), lr=lr)
 
     num_classes = len(KG_nodes['tools'][0])
-    configs['num_classes'] = num_classes
+    configs['vit']['num_classes'] = num_classes
+    configs['vit']['head'] = True
     model_vit = build_vit(configs)
     model_vit.train()
     for name, param in model_vit.named_parameters():
+        print(name, param.shape)
         if 'head' not in name:  # Identify the last head layer
             param.requires_grad = False
 

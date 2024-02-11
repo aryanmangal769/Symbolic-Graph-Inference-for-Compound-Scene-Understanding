@@ -7,10 +7,13 @@ import timm
 
 
 class ViT(nn.Module):
-    def __init__(self, num_classes=10):
+    def __init__(self, num_classes=10, head=True):
         super(ViT, self).__init__()
         self.model = timm.create_model('vit_base_patch16_224', pretrained=True)
-        self.model.head = nn.Linear(self.model.head.in_features, num_classes)
+        if head == True:
+            self.model.head = nn.Linear(self.model.head.in_features, num_classes)
+        else :
+            self.model.head = nn.Identity()
 
     def forward(self, x):
         return self.model(x)

@@ -96,7 +96,7 @@ class MGSNN(nn.Module):
             elif 'single' in self.KG_vocab[node] and torch.any(torch.diagonal(SG_adj) == 1):
                 imp[len(active_idx)+i] = 0
         # # print(imp)
-        imp = F.normalize(imp, p=1, dim=0)
+        # imp = F.normalize(imp, p=1, dim=0)
 
         return imp[len(active_idx):], current_idx[len(active_idx):]
 
