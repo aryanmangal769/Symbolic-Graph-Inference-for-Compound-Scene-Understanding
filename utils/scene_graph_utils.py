@@ -3,7 +3,7 @@ import torch.nn as nn
 from utils.dataset_utils import get_pixel_distance
 import networkx as nx
 import matplotlib.pyplot as plt
-
+from torchvision import transforms
 
 def generate_SG_from_bboxs(bboxes, threshold):
     objects = []
@@ -16,6 +16,24 @@ def generate_SG_from_bboxs(bboxes, threshold):
                 adjacency_matrix[i][j] = 1
                 adjacency_matrix[j][i] = 1
     return objects, adjacency_matrix    
+
+def generate_SG(bboxes, threshold, img, model_vit):
+    transform = transforms.Compose([ transforms.Resize((224, 224)), transforms.ToTensor(),])
+
+    objects = []
+    embeddings = []
+    n = len(bboxes)
+    adjacency_matrix = torch.zeros((n, n))
+    for i in range(n):
+        objects.append(bboxes[i]['object'])
+        embeddings.append(model_vit(transform(img.crop(bboxes[i]['object_bbox'])).unsqueeze(0)).detach())
+        for j in range(i + 1, n):
+            if get_pixel_distance(bboxes[i]['object_bbox'], bboxes[j]['object_bbox']) < threshold:
+                adjacency_matrix[i][j] = 1
+                adjacency_matrix[j][i] = 1
+
+    embeddings = torch.cat(embeddings, dim=0)
+    return objects, embeddings, adjacency_matrix   
 
 def get_KG_active_idx(SG_nodes, SG_Adj, KG_vocab , obj):
     active_idx = []

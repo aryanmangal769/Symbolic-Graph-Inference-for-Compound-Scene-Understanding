@@ -3,9 +3,12 @@ import torch.nn as nn
 from model.graph_models.gcn import GCN
 from model.graph_models.gcn_image import GCNI
 from model.imgsnn.importance_net import Importance_net
+from model.imgsnn.connectivity_head import Connectivity_head
+from model.imgsnn.identity_head import Identity_head
 from utils.graph_utils import get_neighbour_nodes, merge_graphs
 import torch.nn.functional as F
 import pdb
+from model.imgsnn.fusion_net import Fusion_net
 
 
 
@@ -32,21 +35,28 @@ class IMGSNN(nn.Module):
 
         self.gcns = nn.ModuleList([GCN(nfeat, nhid, nout, n_layers, dropout) for _ in range(self.n_steps)])
         self.imps = nn.ModuleList([Importance_net(nout) for _ in range(self.n_steps-1)])
-        self.imps.append(Importance_net(nout, self.image_conditioning, config['vit']['img_dim'], config['vit']['num_classes']))
-        
+        # self.imps.append(Importance_net(nout, self.image_conditioning, config['vit']['img_dim'], config['vit']['num_classes']))
+
+        self.con_head = Connectivity_head(nout)
+        self.id_head = Identity_head(nout,self.image_conditioning, config['vit']['img_dim'], config['vit']['num_classes'])
+
         self._avg_steps = 0
+        self.SG_net = nn.Linear(768, nfeat)
+        self.fusion_net = Fusion_net(config['vit']['num_classes'])
 
         # self.gcn = GCN(nfeat, nhid, nout,n_layers, dropout)
         # self.imp = Importance_net(nout)
 
-    def forward(self, x, KG_adj, SG_adj, active_idx_init, img_feat):
+    def forward(self, x, KG_adj, SG_adj,SG_embeddings, active_idx_init, img_feat):
         '''
         x: Knowledge graph embedding
         adj: Adjacency matrix of the knowledge graph
         active_idx: Active node index
         '''
+        SG_embeddings= self.SG_net(SG_embeddings)
+        SG_embeddings =  SG_adj@SG_embeddings
 
-        x, adj = merge_graphs(x, KG_adj, SG_adj, active_idx_init)
+        x, adj = merge_graphs(x, KG_adj, SG_adj,SG_embeddings, active_idx_init)
 
         active_idx = active_idx_init[0]
         
@@ -94,15 +104,21 @@ class IMGSNN(nn.Module):
         h = self.gcns[-1](x[current_idx, :].clone(), adj[current_idx][:, current_idx].clone())       
         # print(torch.sum(h, dim=1))
 
-        imp = self.imps[-1](h, adj[current_idx][:,current_idx], img_feat)
+        # imp = self.imps[-1](h, adj[current_idx][:,current_idx], img_feat)
+        
+        id_feat = self.id_head(h, img_feat)
+        id_feat = id_feat.squeeze(0)
+        conn_feat = self.con_head(h, adj[current_idx][:,current_idx])
 
-        for i,node in enumerate(neighbor_idx):
-            if 'multiple' in self.KG_vocab[node] and (torch.diagonal(SG_adj) != 1).any().item():
-                imp[len(active_idx)+i] = 0
-            elif 'single' in self.KG_vocab[node] and torch.any(torch.diagonal(SG_adj) == 1):
-                imp[len(active_idx)+i] = 0
-        # # print(imp)
-        # imp = F.normalize(imp, p=1, dim=0)
+        # print(self.KG_nodes['tools'][0])
+        # pdb.set_trace()
+        
+        conn_feat_eq = torch.zeros_like(id_feat)
+        for idx,feat in zip(neighbor_idx, conn_feat[len(active_idx):]):
+            conn_feat_eq[self.KG_nodes['tools'][0].index(self.KG_vocab[idx])] = feat
 
-        return imp, current_idx[len(active_idx):]
+        merged_feat = self.fusion_net(id_feat, conn_feat_eq)
+
+        return id_feat, current_idx[len(active_idx):]
+        # return merged_feat, current_idx[len(active_idx):]
 

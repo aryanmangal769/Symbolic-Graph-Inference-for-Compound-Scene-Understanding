@@ -70,7 +70,7 @@ class ADE_20k(Dataset):
         path = self.paths[idx]
         path = find_file(path, self.data_dir)
         img = Image.open(path).convert("RGB")
-        img = self.transform(img)
+        # img = self.transform(img)
         # img = None
         # print(path)
         obj = self.objects[idx]

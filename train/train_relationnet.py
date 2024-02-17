@@ -66,7 +66,7 @@ def train(configs):
         # Validation loop
         model.eval()
         with torch.no_grad():
-            # total_loss = 0.0
+            total_loss = 0.0
             correct_predictions = 0
             for relations, embeddings in test_dataloader:
                 outputs = model(embeddings.float())

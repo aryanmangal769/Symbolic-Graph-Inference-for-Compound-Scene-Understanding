@@ -17,7 +17,7 @@ from datasets.epic_kitchens import EPIC_Kitchens
 from datasets.places_365 import PLACES_365
 from datasets.ade20k import ADE_20k
 from utils.dataset_utils import custom_collate
-from utils.scene_graph_utils import generate_SG_from_bboxs, get_KG_active_idx, visualize_graph, get_SG_active_idx
+from utils.scene_graph_utils import generate_SG_from_bboxs, get_KG_active_idx, visualize_graph, get_SG_active_idx, generate_SG
 from utils.vis_utils import visualize_bbox
 import numpy as np
 import pdb
@@ -83,6 +83,8 @@ def train(configs):
     alpha = configs['alpha']
     lr = configs['lr']
 
+    transform = transforms.Compose([transforms.Resize((224, 224)), transforms.ToTensor(),])
+
    
     KG_path = configs['KG_path']    
     with open(KG_path, 'rb') as f:
@@ -146,7 +148,8 @@ def train(configs):
                 obj = obj[0]
                 # print("Verb: ", verb)
 
-                SG_nodes, SG_Adj = generate_SG_from_bboxs(bbox, 1000) 
+                # SG_nodes, SG_Adj = generate_SG_from_bboxs(bbox, 1000) 
+                SG_nodes, SG_embeddings, SG_Adj = generate_SG(bbox, 1000, img, model_vit) 
                 # print(SG_nodes)
                 # visualize_graph(SG_nodes, SG_Adj)
 
@@ -159,9 +162,9 @@ def train(configs):
                 #     print(KG_vocab[node])
                 # print("####")
 
-                img_feat = model_vit(img.unsqueeze(0))
+                img_feat = model_vit(transform(img).unsqueeze(0))
 
-                imp, idx = model_mgsnn(KG_embeddings, KG_adjacency_matrix, SG_Adj,[active_idx, active_SG_idx], img_feat)
+                imp, idx = model_mgsnn(KG_embeddings, KG_adjacency_matrix, SG_Adj,SG_embeddings, [active_idx, active_SG_idx], img_feat)
                 imp = imp.squeeze(0)
                 onehot = torch.tensor([float(tool == verb) for tool in KG_nodes['tools'][0]], dtype=torch.float32).to(imp.device)
                 
@@ -212,14 +215,14 @@ def train(configs):
         for VISOR_bboxs,objs, imgs in tqdm(test_dataloader):
             verbs = torch.tensor([KG_vocab.index(obj[1]) for obj in objs])
 
-            current_verb = verbs[0].item()
-            if current_verb in verb_counts:
-                verb_counts[current_verb] += 1
-            else:
-                verb_counts[current_verb] = 1
+            # current_verb = verbs[0].item()
+            # if current_verb in verb_counts:
+            #     verb_counts[current_verb] += 1
+            # else:
+            #     verb_counts[current_verb] = 1
 
-            if verb_counts[current_verb] > 5:
-                continue
+            # if verb_counts[current_verb] > 5:
+            #     continue
 
             # Get the image
             # img = imgs[0]
@@ -242,10 +245,11 @@ def train(configs):
                 
                 # print("Verb: ", verb)
 
-                SG_nodes, SG_Adj = generate_SG_from_bboxs(bbox, 1000) 
+                # SG_nodes, SG_Adj = generate_SG_from_bboxs(bbox, 1000) 
                 # print(SG_nodes)
                 # visualize_graph(SG_nodes, SG_Adj)
                 # active_idxs.append(SG_nodes)
+                SG_nodes, SG_embeddings, SG_Adj = generate_SG(bbox, 1000, img, model_vit)
 
                 active_idx = get_KG_active_idx(SG_nodes, SG_Adj, KG_vocab , obj)
                 active_SG_idx = get_SG_active_idx(SG_nodes, SG_Adj, KG_vocab , obj)
@@ -258,11 +262,9 @@ def train(configs):
                     # print(KG_vocab[node])
                 active_idxs.append(act_arr)
 
+                img_feat = model_vit(transform(img).unsqueeze(0))
 
-                
-                img_feat = model_vit(img.unsqueeze(0))
-
-                imp, idx = model_mgsnn(KG_embeddings, KG_adjacency_matrix, SG_Adj,[active_idx, active_SG_idx], img_feat)
+                imp, idx = model_mgsnn(KG_embeddings, KG_adjacency_matrix, SG_Adj, SG_embeddings, [active_idx, active_SG_idx], img_feat)
                 imp = imp.squeeze(0)    
                 onehot = torch.tensor([float(tool == verb) for tool in KG_nodes['tools'][0]], dtype=torch.float32).to(imp.device)
                 
@@ -286,7 +288,7 @@ def train(configs):
                 actual_verbs.append(verb)
 
 
-                actions = get_actions(torch.cat((GSNN_output.detach().cpu(), active_idx)), KG_path)
+                # actions = get_actions(torch.cat((GSNN_output.detach().cpu(), active_idx)), KG_path)
                 # # print(actions)
                 # for node in GSNN_output.detach().int():
                 #     print(KG_vocab[node])
@@ -299,6 +301,17 @@ def train(configs):
                 # print("####")
             
             GSNN_outputs = torch.stack(GSNN_outputs, dim=1)
+            # print("Accuracy", get_accuracy(GSNN_outputs.squeeze(1).float(), verbs.to(GSNN_outputs.device).float()))
+
+            acc = get_accuracy(GSNN_outputs.squeeze(1).float(), verbs.to(GSNN_outputs.device).float())
+            # if acc < 1 and epoch == 2:
+            #     img = imgs[0]
+            #     verb_folder = os.path.join('results/mgnn_wrong', KG_vocab[verbs[0].item()].replace('/', ''))
+            #     os.makedirs(verb_folder, exist_ok=True)
+            #     img_path = os.path.join(verb_folder, f"image_{acc}.png")
+            #     # img_pil = transforms.ToPILImage()(img)
+            #     img.save(img_path)
+
             test_accuracy.append(get_accuracy(GSNN_outputs.squeeze(1).float(), verbs.to(GSNN_outputs.device).float()))
 
         
