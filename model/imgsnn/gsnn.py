@@ -34,6 +34,7 @@ class IMGSNN(nn.Module):
         self.imps = nn.ModuleList([Importance_net(nout) for _ in range(self.n_steps-1)])
         self.imps.append(Importance_net(nout, self.image_conditioning, config['vit']['img_dim'], config['vit']['num_classes']))
 
+
         self._avg_steps = 0
         self.SG_net = nn.Linear(768, nfeat)
 
@@ -98,5 +99,6 @@ class IMGSNN(nn.Module):
         # print(torch.sum(h, dim=1))
 
         imp = self.imps[-1](h, adj[current_idx][:,current_idx], img_feat)
+
 
         return imp, current_idx[len(active_idx):]
