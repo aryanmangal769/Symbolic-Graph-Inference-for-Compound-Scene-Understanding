@@ -56,8 +56,12 @@ def get_KG_active_idx(SG_nodes, SG_Adj, KG_vocab , obj):
         SG_nodes[SG_nodes.index("minced meat")] = "meat"
 
     # Find the index of the object in KG_vocab
-    obj_idx = KG_vocab.index(obj)
-    active_idx.append(obj_idx)
+    try :
+        obj_idx = KG_vocab.index(obj)
+        active_idx.append(obj_idx)
+    except:
+        ## Appending with background such that the model can still run
+        active_idx.append(1)
 
     # Find the neighbors of the object in SG_Adj
     if obj not in SG_nodes:  # If the object is not present in the scene graph we takes the first object as the principal object

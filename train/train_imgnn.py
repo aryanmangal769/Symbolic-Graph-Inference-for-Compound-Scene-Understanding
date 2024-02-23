@@ -149,14 +149,18 @@ def train(configs):
                 # print("Verb: ", verb)
 
                 # SG_nodes, SG_Adj = generate_SG_from_bboxs(bbox, 1000) 
-                SG_nodes, SG_embeddings, SG_Adj = generate_SG(bbox, 1000, img, model_vit) 
+                # SG_nodes, SG_embeddings, SG_Adj = generate_SG(bbox, 1000, img, model_vit) 
+                SG_nodes, SG_embeddings, SG_Adj = generate_SG(bbox, 400, img, model_vit) 
                 # print(SG_nodes)
                 # visualize_graph(SG_nodes, SG_Adj)
 
 
                 active_idx = get_KG_active_idx(SG_nodes, SG_Adj, KG_vocab , obj)
                 active_SG_idx = get_SG_active_idx(SG_nodes, SG_Adj, KG_vocab , obj)
-                # print(active_idx)
+                
+                # Only used when we want (Save some initial active nodes get the results and merge them)
+                active_idx_1 = get_KG_active_idx(SG_nodes, SG_Adj, KG_vocab , SG_nodes[0].split('_')[0])
+                active_SG_idx_1 = get_SG_active_idx(SG_nodes, SG_Adj, KG_vocab , SG_nodes[0].split('_')[0])
 
                 # for node in active_idx:
                 #     print(KG_vocab[node])
@@ -165,6 +169,14 @@ def train(configs):
                 img_feat = model_vit(transform(img).unsqueeze(0))
 
                 imp, idx = model_mgsnn(KG_embeddings, KG_adjacency_matrix, SG_Adj,SG_embeddings, [active_idx, active_SG_idx], img_feat)
+
+                # Only used when we want (Save some initial active nodes get the results and merge them)
+                imp_1, idx_1 = model_mgsnn(KG_embeddings, KG_adjacency_matrix, SG_Adj,SG_embeddings, [active_idx_1, active_SG_idx_1], img_feat)
+                if imp_1.max() > imp.max():
+                    imp = imp_1
+                    idx = idx_1
+
+
                 imp = imp.squeeze(0)
                 onehot = torch.tensor([float(tool == verb) for tool in KG_nodes['tools'][0]], dtype=torch.float32).to(imp.device)
                 
@@ -174,6 +186,11 @@ def train(configs):
                 optimizer.step()
 
                 idx_all = torch.tensor([KG_vocab.index(verb) for verb in KG_nodes['tools'][0]]).to(imp.device)
+
+                # for i, id in enumerate(idx_all):
+                #     if id not in idx:
+                #         imp[i] = 0
+
                 GSNN_output =idx_all[torch.topk(imp, k=1).indices]
 
                 # for node in idx:
@@ -249,12 +266,15 @@ def train(configs):
                 # print(SG_nodes)
                 # visualize_graph(SG_nodes, SG_Adj)
                 # active_idxs.append(SG_nodes)
-                SG_nodes, SG_embeddings, SG_Adj = generate_SG(bbox, 1000, img, model_vit)
+                # SG_nodes, SG_embeddings, SG_Adj = generate_SG(bbox, 1000, img, model_vit)
+                SG_nodes, SG_embeddings, SG_Adj = generate_SG(bbox, 400, img, model_vit)
 
                 active_idx = get_KG_active_idx(SG_nodes, SG_Adj, KG_vocab , obj)
                 active_SG_idx = get_SG_active_idx(SG_nodes, SG_Adj, KG_vocab , obj)
 
-                # print(active_idx)
+                # Only used when we want (Save some initial active nodes get the results and merge them)
+                active_idx_1 = get_KG_active_idx(SG_nodes, SG_Adj, KG_vocab , SG_nodes[0])
+                active_SG_idx_1 = get_SG_active_idx(SG_nodes, SG_Adj, KG_vocab , SG_nodes[0])
 
                 act_arr = []
                 for node in active_idx:
@@ -265,17 +285,25 @@ def train(configs):
                 img_feat = model_vit(transform(img).unsqueeze(0))
 
                 imp, idx = model_mgsnn(KG_embeddings, KG_adjacency_matrix, SG_Adj, SG_embeddings, [active_idx, active_SG_idx], img_feat)
+
+                # Only used when we want (Save some initial active nodes get the results and merge them)
+                imp_1, idx_1 = model_mgsnn(KG_embeddings, KG_adjacency_matrix, SG_Adj,SG_embeddings, [active_idx_1, active_SG_idx_1], img_feat)
+                if imp_1.max() > imp.max():
+                    imp = imp_1
+                    idx = idx_1
+
                 imp = imp.squeeze(0)    
                 onehot = torch.tensor([float(tool == verb) for tool in KG_nodes['tools'][0]], dtype=torch.float32).to(imp.device)
                 
                 loss = ce_loss(imp, onehot)
 
                 idx_all = torch.tensor([KG_vocab.index(verb) for verb in KG_nodes['tools'][0]]).to(imp.device)
+                
+                # for i, id in enumerate(idx_all):
+                #     if id not in idx:
+                #         imp[i] = 0
+                
                 GSNN_output =idx_all[torch.topk(imp, k=1).indices]
-
-
-
-                loss = MSE_loss(imp, onehot.float())
             
 
 
@@ -348,7 +376,7 @@ def main():
         "-g", "--gpu",
         dest = "gpu",
         type = int, 
-        default = [1]
+        default = [2]
     )
     args = parser.parse_args()
 
