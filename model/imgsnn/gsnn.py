@@ -3,12 +3,9 @@ import torch.nn as nn
 from model.graph_models.gcn import GCN
 from model.graph_models.gcn_image import GCNI
 from model.imgsnn.importance_net import Importance_net
-from model.imgsnn.connectivity_head import Connectivity_head
-from model.imgsnn.identity_head import Identity_head
 from utils.graph_utils import get_neighbour_nodes, merge_graphs
 import torch.nn.functional as F
 import pdb
-from model.imgsnn.fusion_net import Fusion_net
 
 
 
@@ -35,14 +32,10 @@ class IMGSNN(nn.Module):
 
         self.gcns = nn.ModuleList([GCN(nfeat, nhid, nout, n_layers, dropout) for _ in range(self.n_steps)])
         self.imps = nn.ModuleList([Importance_net(nout) for _ in range(self.n_steps-1)])
-        # self.imps.append(Importance_net(nout, self.image_conditioning, config['vit']['img_dim'], config['vit']['num_classes']))
-
-        self.con_head = Connectivity_head(nout)
-        self.id_head = Identity_head(nout,self.image_conditioning, config['vit']['img_dim'], config['vit']['num_classes'])
+        self.imps.append(Importance_net(nout, self.image_conditioning, config['vit']['img_dim'], config['vit']['num_classes']))
 
         self._avg_steps = 0
         self.SG_net = nn.Linear(768, nfeat)
-        self.fusion_net = Fusion_net(config['vit']['num_classes'])
 
         # self.gcn = GCN(nfeat, nhid, nout,n_layers, dropout)
         # self.imp = Importance_net(nout)
@@ -104,21 +97,6 @@ class IMGSNN(nn.Module):
         h = self.gcns[-1](x[current_idx, :].clone(), adj[current_idx][:, current_idx].clone())       
         # print(torch.sum(h, dim=1))
 
-        # imp = self.imps[-1](h, adj[current_idx][:,current_idx], img_feat)
-        
-        id_feat = self.id_head(h, img_feat)
-        id_feat = id_feat.squeeze(0)
-        conn_feat = self.con_head(h, adj[current_idx][:,current_idx])
+        imp = self.imps[-1](h, adj[current_idx][:,current_idx], img_feat)
 
-        # print(self.KG_nodes['tools'][0])
-        # pdb.set_trace()
-        
-        conn_feat_eq = torch.zeros_like(id_feat)
-        for idx,feat in zip(neighbor_idx, conn_feat[len(active_idx):]):
-            conn_feat_eq[self.KG_nodes['tools'][0].index(self.KG_vocab[idx])] = feat
-
-        merged_feat = self.fusion_net(id_feat, conn_feat_eq)
-
-        # return id_feat, current_idx[len(active_idx):]
-        return merged_feat, current_idx[len(active_idx):]
-
+        return imp, current_idx[len(active_idx):]
