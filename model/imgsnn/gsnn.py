@@ -119,6 +119,6 @@ class IMGSNN(nn.Module):
 
         merged_feat = self.fusion_net(id_feat, conn_feat_eq)
 
-        return id_feat, current_idx[len(active_idx):]
-        # return merged_feat, current_idx[len(active_idx):]
+        # return id_feat, current_idx[len(active_idx):]
+        return merged_feat, current_idx[len(active_idx):]
 
